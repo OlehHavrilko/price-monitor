@@ -18,3 +18,7 @@ def sources() -> dict[str, SourceConfig]:
     """Fixed source list. Users cannot add URLs at runtime; the demo catalog is the default source."""
     demo_url = os.environ.get("PRICE_MONITOR_DEMO_URL", "http://127.0.0.1:8080")
     return {"demo": SourceConfig(id="demo", base_url=demo_url, adapter="demo")}
+
+
+def reports_dir() -> Path:
+    return Path(os.environ.get("PRICE_MONITOR_REPORTS", "data/reports"))

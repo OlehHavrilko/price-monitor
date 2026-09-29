@@ -4,7 +4,10 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .models import ProductObservation
+from decimal import Decimal
+
+from . import comparison
+from .models import Availability, ProductObservation
 
 # Each entry upgrades the schema by one version. Never edit an applied entry; append a new one.
 MIGRATIONS: list[str] = [
@@ -45,6 +48,36 @@ MIGRATIONS: list[str] = [
         UNIQUE (run_id, product_key),
         FOREIGN KEY (source_id, product_key) REFERENCES products(source_id, product_key)
     );
+    """,
+    """
+    CREATE TABLE product_state (
+        source_id TEXT NOT NULL,
+        product_key TEXT NOT NULL,
+        missing_count INTEGER NOT NULL DEFAULT 0,
+        removed INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (source_id, product_key),
+        FOREIGN KEY (source_id, product_key) REFERENCES products(source_id, product_key)
+    );
+    CREATE TABLE tracking_rules (
+        source_id TEXT NOT NULL,
+        product_key TEXT NOT NULL,
+        threshold TEXT,
+        drop_percent TEXT,
+        PRIMARY KEY (source_id, product_key),
+        FOREIGN KEY (source_id, product_key) REFERENCES products(source_id, product_key)
+    );
+    CREATE TABLE events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id INTEGER NOT NULL REFERENCES collection_runs(id),
+        source_id TEXT NOT NULL,
+        product_key TEXT NOT NULL,
+        type TEXT NOT NULL,
+        old_value TEXT,
+        new_value TEXT,
+        created_at TEXT NOT NULL,
+        UNIQUE (run_id, product_key, type)
+    );
+    CREATE INDEX idx_events_source_time ON events(source_id, created_at);
     """,
 ]
 
@@ -90,6 +123,13 @@ def ensure_source(conn: sqlite3.Connection, source_id: str, base_url: str) -> No
     )
 
 
+def _break_missing_series(conn: sqlite3.Connection, source_id: str) -> None:
+    """An unsuccessful attempt does not confirm absence and interrupts the series of absences."""
+    conn.execute(
+        "UPDATE product_state SET missing_count = 0 WHERE source_id = ? AND removed = 0", (source_id,)
+    )
+
+
 def mark_interrupted(conn: sqlite3.Connection, source_id: str) -> int:
     """Runs left in 'running' by a crashed process must never become a comparison baseline."""
     cur = conn.execute(
@@ -97,6 +137,8 @@ def mark_interrupted(conn: sqlite3.Connection, source_id: str) -> int:
         "WHERE source_id = ? AND status = 'running'",
         (utcnow(), source_id),
     )
+    if cur.rowcount:
+        _break_missing_series(conn, source_id)
     return cur.rowcount
 
 
@@ -113,15 +155,59 @@ def fail_run(conn: sqlite3.Connection, run_id: int, error: str) -> None:
         "UPDATE collection_runs SET status = 'failed', finished_at = ?, error = ? WHERE id = ?",
         (utcnow(), error, run_id),
     )
+    source_id = conn.execute("SELECT source_id FROM collection_runs WHERE id = ?", (run_id,)).fetchone()[0]
+    _break_missing_series(conn, source_id)
+
+
+def _row_to_observation(r: sqlite3.Row) -> ProductObservation:
+    return ProductObservation(
+        product_key=r["product_key"],
+        name=r["name"],
+        url=r["url"],
+        price=Decimal(r["price"]),
+        currency=r["currency"],
+        availability=Availability(r["availability"]),
+    )
+
+
+def _load_comparison_inputs(conn: sqlite3.Connection, run_id: int, source_id: str):
+    previous_run = conn.execute(
+        "SELECT id FROM collection_runs WHERE source_id = ? AND status = 'success' AND id < ? "
+        "ORDER BY id DESC LIMIT 1",
+        (source_id, run_id),
+    ).fetchone()
+    previous = {}
+    if previous_run:
+        rows = conn.execute("SELECT * FROM observations WHERE run_id = ?", (previous_run["id"],))
+        previous = {r["product_key"]: _row_to_observation(r) for r in rows}
+    known = {r[0] for r in conn.execute("SELECT product_key FROM products WHERE source_id = ?", (source_id,))}
+    states = {
+        r["product_key"]: comparison.ProductState(r["missing_count"], bool(r["removed"]))
+        for r in conn.execute("SELECT * FROM product_state WHERE source_id = ?", (source_id,))
+    }
+    rules = {
+        r["product_key"]: comparison.Rule(
+            Decimal(r["threshold"]) if r["threshold"] else None,
+            Decimal(r["drop_percent"]) if r["drop_percent"] else None,
+        )
+        for r in conn.execute("SELECT * FROM tracking_rules WHERE source_id = ?", (source_id,))
+    }
+    return previous_run is not None, previous, known, states, rules
 
 
 def commit_snapshot(
     conn: sqlite3.Connection, run_id: int, source_id: str, items: list[ProductObservation]
-) -> None:
-    """Save a fully validated snapshot and close the run in one transaction."""
+) -> list[comparison.Event]:
+    """Save a validated snapshot, its events and the run result in one transaction."""
     now = utcnow()
+    current = {i.product_key: i for i in items}
     conn.execute("BEGIN IMMEDIATE")
     try:
+        has_baseline, previous, known, states, rules = _load_comparison_inputs(conn, run_id, source_id)
+        # The first successful run is only a baseline: there is nothing to compare it with.
+        events, new_states = [], {}
+        if has_baseline:
+            events, new_states = comparison.compare(previous, current, known, states, rules)
         for item in items:
             conn.execute(
                 "INSERT INTO products(source_id, product_key, name, url, first_seen) VALUES (?, ?, ?, ?, ?) "
@@ -143,6 +229,19 @@ def commit_snapshot(
                     now,
                 ),
             )
+        for key, state in new_states.items():
+            conn.execute(
+                "INSERT INTO product_state(source_id, product_key, missing_count, removed) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(source_id, product_key) DO UPDATE SET "
+                "missing_count = excluded.missing_count, removed = excluded.removed",
+                (source_id, key, state.missing_count, int(state.removed)),
+            )
+        for ev in events:
+            conn.execute(
+                "INSERT INTO events(run_id, source_id, product_key, type, old_value, new_value, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (run_id, source_id, ev.product_key, ev.type, ev.old_value, ev.new_value, now),
+            )
         conn.execute(
             "UPDATE collection_runs SET status = 'success', finished_at = ?, product_count = ? WHERE id = ?",
             (now, len(items), run_id),
@@ -151,6 +250,40 @@ def commit_snapshot(
         conn.execute("ROLLBACK")
         raise
     conn.execute("COMMIT")
+    return events
+
+
+def set_rule(
+    conn: sqlite3.Connection,
+    source_id: str,
+    product_key: str,
+    threshold: Decimal | None = None,
+    drop_percent: Decimal | None = None,
+) -> None:
+    """Create or replace the rule of a known product. Repeating the same call changes nothing."""
+    if threshold is not None and threshold < 0:
+        raise ValueError("Threshold must not be negative")
+    if drop_percent is not None and drop_percent <= 0:
+        raise ValueError("Drop percent must be positive")
+    if not conn.execute(
+        "SELECT 1 FROM products WHERE source_id = ? AND product_key = ?", (source_id, product_key)
+    ).fetchone():
+        raise ValueError(f"Unknown product '{product_key}' in source '{source_id}'")
+    conn.execute(
+        "INSERT INTO tracking_rules(source_id, product_key, threshold, drop_percent) VALUES (?, ?, ?, ?) "
+        "ON CONFLICT(source_id, product_key) DO UPDATE SET "
+        "threshold = excluded.threshold, drop_percent = excluded.drop_percent",
+        (
+            source_id,
+            product_key,
+            None if threshold is None else str(threshold),
+            None if drop_percent is None else str(drop_percent),
+        ),
+    )
+
+
+def remove_rule(conn: sqlite3.Connection, source_id: str, product_key: str) -> None:
+    conn.execute("DELETE FROM tracking_rules WHERE source_id = ? AND product_key = ?", (source_id, product_key))
 
 
 def last_success_run(conn: sqlite3.Connection, source_id: str) -> sqlite3.Row | None:

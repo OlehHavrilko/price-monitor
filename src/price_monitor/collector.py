@@ -28,6 +28,7 @@ class RunResult:
     product_count: int = 0
     error: str | None = None
     fatal: bool = False
+    events: tuple = ()
 
 
 def collect_once(
@@ -50,7 +51,7 @@ def collect_once(
             reason = f"Unexpected error: {type(exc).__name__}: {exc}"
             storage.fail_run(conn, run_id, reason)
             return RunResult(run_id, False, error=reason)
-        storage.commit_snapshot(conn, run_id, source.id, items)
-        return RunResult(run_id, True, product_count=len(items))
+        events = storage.commit_snapshot(conn, run_id, source.id, items)
+        return RunResult(run_id, True, product_count=len(items), events=tuple(events))
     finally:
         lock.release()
