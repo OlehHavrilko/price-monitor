@@ -22,6 +22,7 @@ class SourceConfig:
     page_delay: float = 0.5
     retries: int = 2
     retry_backoff: float = 1.0
+    interval: int = 3600  # seconds between scheduled collections
 
 
 @dataclass(frozen=True)

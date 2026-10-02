@@ -4,9 +4,10 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
+from collections.abc import Sequence
 from decimal import Decimal
 
-from . import comparison
+from . import comparison, notifications, outbox
 from .models import Availability, ProductObservation
 
 # Each entry upgrades the schema by one version. Never edit an applied entry; append a new one.
@@ -78,6 +79,28 @@ MIGRATIONS: list[str] = [
         UNIQUE (run_id, product_key, type)
     );
     CREATE INDEX idx_events_source_time ON events(source_id, created_at);
+    """,
+    """
+    CREATE TABLE notification_outbox (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chat_id INTEGER NOT NULL,
+        dedupe_key TEXT NOT NULL,
+        text TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('pending', 'sent', 'failed')),
+        attempts INTEGER NOT NULL DEFAULT 0,
+        next_attempt_at TEXT NOT NULL,
+        last_error TEXT,
+        created_at TEXT NOT NULL,
+        sent_at TEXT,
+        UNIQUE (chat_id, dedupe_key)
+    );
+    CREATE INDEX idx_outbox_due ON notification_outbox(status, next_attempt_at);
+    CREATE TABLE source_health (
+        source_id TEXT PRIMARY KEY REFERENCES sources(id),
+        alerted INTEGER NOT NULL DEFAULT 0,
+        stopped INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT
+    );
     """,
 ]
 
@@ -195,10 +218,88 @@ def _load_comparison_inputs(conn: sqlite3.Connection, run_id: int, source_id: st
     return previous_run is not None, previous, known, states, rules
 
 
+def _enqueue_product_alerts(
+    conn: sqlite3.Connection,
+    run_id: int,
+    source_id: str,
+    recipients: Sequence[int],
+    events: list[comparison.Event],
+    tracked: set[str],
+) -> None:
+    by_product: dict[str, list[comparison.Event]] = {}
+    for ev in events:
+        if ev.product_key in tracked and ev.type in notifications.NOTIFIABLE:
+            by_product.setdefault(ev.product_key, []).append(ev)
+    for key, evs in by_product.items():
+        row = conn.execute(
+            "SELECT p.name, p.url, (SELECT currency FROM observations o WHERE o.source_id = p.source_id "
+            "AND o.product_key = p.product_key ORDER BY o.id DESC LIMIT 1) AS currency "
+            "FROM products p WHERE p.source_id = ? AND p.product_key = ?",
+            (source_id, key),
+        ).fetchone()
+        text = notifications.product_message(source_id, key, row["name"], row["url"], row["currency"] or "", evs)
+        outbox.enqueue(conn, recipients, f"{run_id}:{key}", text)
+
+
+def _update_source_health_on_success(
+    conn: sqlite3.Connection, source_id: str, run_id: int, recipients: Sequence[int]
+) -> None:
+    row = conn.execute("SELECT alerted FROM source_health WHERE source_id = ?", (source_id,)).fetchone()
+    if row and row["alerted"]:
+        outbox.enqueue(conn, recipients, f"{run_id}:recovered", notifications.source_recovered_message(source_id))
+    conn.execute(
+        "INSERT INTO source_health(source_id, alerted, stopped, last_error) VALUES (?, 0, 0, NULL) "
+        "ON CONFLICT(source_id) DO UPDATE SET alerted = 0, last_error = NULL",
+        (source_id,),
+    )
+
+
+def record_failure(
+    conn: sqlite3.Connection,
+    run_id: int,
+    source_id: str,
+    error: str,
+    fatal: bool = False,
+    recipients: Sequence[int] = (),
+) -> None:
+    """Close a run as failed. The operator is told once per outage, not on every failed cycle."""
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        fail_run(conn, run_id, error)
+        row = conn.execute("SELECT alerted FROM source_health WHERE source_id = ?", (source_id,)).fetchone()
+        if not (row and row["alerted"]):
+            outbox.enqueue(
+                conn, recipients, f"{run_id}:failed", notifications.source_failed_message(source_id, error, fatal)
+            )
+        conn.execute(
+            "INSERT INTO source_health(source_id, alerted, stopped, last_error) VALUES (?, 1, ?, ?) "
+            "ON CONFLICT(source_id) DO UPDATE SET alerted = 1, last_error = excluded.last_error, "
+            "stopped = MAX(stopped, excluded.stopped)",
+            (source_id, int(fatal), error),
+        )
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    conn.execute("COMMIT")
+
+
+def is_stopped(conn: sqlite3.Connection, source_id: str) -> bool:
+    row = conn.execute("SELECT stopped FROM source_health WHERE source_id = ?", (source_id,)).fetchone()
+    return bool(row and row["stopped"])
+
+
+def resume_source(conn: sqlite3.Connection, source_id: str) -> None:
+    conn.execute("UPDATE source_health SET stopped = 0 WHERE source_id = ?", (source_id,))
+
+
 def commit_snapshot(
-    conn: sqlite3.Connection, run_id: int, source_id: str, items: list[ProductObservation]
+    conn: sqlite3.Connection,
+    run_id: int,
+    source_id: str,
+    items: list[ProductObservation],
+    recipients: Sequence[int] = (),
 ) -> list[comparison.Event]:
-    """Save a validated snapshot, its events and the run result in one transaction."""
+    """Save a validated snapshot, its events, queued notifications and the run result in one transaction."""
     now = utcnow()
     current = {i.product_key: i for i in items}
     conn.execute("BEGIN IMMEDIATE")
@@ -242,6 +343,8 @@ def commit_snapshot(
                 "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (run_id, source_id, ev.product_key, ev.type, ev.old_value, ev.new_value, now),
             )
+        _enqueue_product_alerts(conn, run_id, source_id, recipients, events, set(rules))
+        _update_source_health_on_success(conn, source_id, run_id, recipients)
         conn.execute(
             "UPDATE collection_runs SET status = 'success', finished_at = ?, product_count = ? WHERE id = ?",
             (now, len(items), run_id),

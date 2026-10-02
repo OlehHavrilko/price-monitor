@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
+import logging
 import sys
 from collections import Counter
 from datetime import datetime, timezone
@@ -17,7 +19,8 @@ def cmd_collect(args: argparse.Namespace) -> int:
     db = config.db_path()
     db.parent.mkdir(parents=True, exist_ok=True)
     conn = storage.connect(db)
-    result = collect_once(conn, sources[args.source])
+    recipients = config.allowed_ids() if config.telegram_enabled() else ()
+    result = collect_once(conn, sources[args.source], recipients=recipients, lock_dir=config.lock_dir())
     if not result.ok:
         print(f"Collection failed: {result.error}", file=sys.stderr)
         return 1
@@ -48,6 +51,23 @@ def cmd_report(args: argparse.Namespace) -> int:
         print(f"Report not created: {exc}", file=sys.stderr)
         return 1
     print(f"Report written: {path}")
+    return 0
+
+
+def cmd_run(args: argparse.Namespace) -> int:
+    from .scheduler import run_service
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    return asyncio.run(run_service())
+
+
+def cmd_resume_source(args: argparse.Namespace) -> int:
+    if args.source not in config.sources():
+        print(f"Unknown source '{args.source}'.", file=sys.stderr)
+        return 2
+    conn = storage.connect(config.db_path())
+    storage.resume_source(conn, args.source)
+    print(f"Source '{args.source}' can be collected again.")
     return 0
 
 
@@ -86,6 +106,13 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("collect", help="run one collection for a source")
     p.add_argument("source", nargs="?", default="demo")
     p.set_defaults(func=cmd_collect)
+
+    p = sub.add_parser("run", help="run the service: schedule, notification delivery and the Telegram bot")
+    p.set_defaults(func=cmd_run)
+
+    p = sub.add_parser("resume-source", help="allow collection of a source stopped after HTTP 401/403")
+    p.add_argument("source")
+    p.set_defaults(func=cmd_resume_source)
 
     p = sub.add_parser("report", help="write an XLSX report; the period is in UTC, end excluded")
     p.add_argument("--source", default="demo")
