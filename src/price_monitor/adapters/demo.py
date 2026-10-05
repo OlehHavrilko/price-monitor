@@ -1,21 +1,15 @@
 from __future__ import annotations
 
-import time
 from decimal import Decimal, InvalidOperation
-from urllib.parse import urldefrag, urljoin, urlparse
+from urllib.parse import urldefrag, urljoin
 
 import httpx
 from bs4 import BeautifulSoup
 
-from ..http import get_page
 from ..models import Availability, CollectionError, ProductObservation, SourceConfig
+from .paging import collect_pages
 
 STOCK_TEXT = {"in stock": Availability.IN_STOCK, "out of stock": Availability.OUT_OF_STOCK}
-
-
-def _same_origin(base: str, url: str) -> bool:
-    a, b = urlparse(base), urlparse(url)
-    return (a.scheme, a.netloc) == (b.scheme, b.netloc)
 
 
 def parse_page(html: str, page_url: str) -> tuple[int, list[ProductObservation], str | None]:
@@ -63,31 +57,4 @@ def parse_page(html: str, page_url: str) -> tuple[int, list[ProductObservation],
 
 
 def fetch_snapshot(client: httpx.Client, source: SourceConfig) -> list[ProductObservation]:
-    url: str | None = urljoin(source.base_url, "/catalog?page=1")
-    seen_pages: set[str] = set()
-    products: dict[str, ProductObservation] = {}
-    declared_total: int | None = None
-
-    while url:
-        if url in seen_pages:
-            raise CollectionError(f"Pagination loop: {url} was already visited")
-        if len(seen_pages) >= source.max_pages:
-            raise CollectionError(f"Page limit {source.max_pages} reached before the catalog ended")
-        if not _same_origin(source.base_url, url):
-            raise CollectionError(f"Next page {url} is outside the allowed source")
-        if seen_pages:
-            time.sleep(source.page_delay)
-        seen_pages.add(url)
-
-        declared, items, url = parse_page(get_page(client, source, url), url)
-        if declared_total is not None and declared != declared_total:
-            raise CollectionError("Declared product count changed between pages")
-        declared_total = declared
-        for item in items:
-            if item.product_key in products:
-                raise CollectionError(f"Duplicate product key '{item.product_key}' in one snapshot")
-            products[item.product_key] = item
-
-    if declared_total != len(products):
-        raise CollectionError(f"Collected {len(products)} products, source declares {declared_total}")
-    return list(products.values())
+    return collect_pages(client, source, urljoin(source.base_url, "/catalog?page=1"), parse_page)

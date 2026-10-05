@@ -1,0 +1,34 @@
+# Two containers: the demo catalog (a test bench) and the monitor. The database lives in the
+# named volume "data" and survives `docker compose down` and container restarts.
+services:
+  demo:
+    build: .
+    command: ["price-monitor", "demo-serve", "--host", "0.0.0.0", "--port", "8080"]
+    volumes:
+      - demo-state:/demo-state
+    ports:
+      - "127.0.0.1:8080:8080" # catalog is read-only over HTTP; scenarios change only via the CLI below
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/catalog?page=1')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  monitor:
+    build: .
+    depends_on:
+      demo:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PRICE_MONITOR_DEMO_URL: http://demo:8080
+      PRICE_MONITOR_INTERVAL_SECONDS: ${PRICE_MONITOR_INTERVAL_SECONDS:-60}
+    volumes:
+      - data:/data
+    restart: unless-stopped
+
+volumes:
+  data:
+  demo-state:

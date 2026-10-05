@@ -18,7 +18,13 @@ def sources() -> dict[str, SourceConfig]:
     """Fixed source list. Users cannot add URLs at runtime; the demo catalog is the default source."""
     demo_url = os.environ.get("PRICE_MONITOR_DEMO_URL", "http://127.0.0.1:8080")
     interval = int(os.environ.get("PRICE_MONITOR_INTERVAL_SECONDS", "3600"))
-    return {"demo": SourceConfig(id="demo", base_url=demo_url, adapter="demo", interval=interval)}
+    result = {"demo": SourceConfig(id="demo", base_url=demo_url, adapter="demo", interval=interval)}
+    # The external practice site is off by default and has to be switched on explicitly.
+    if os.environ.get("PRICE_MONITOR_ENABLE_BOOKS") == "1":
+        result["books"] = SourceConfig(
+            id="books", base_url="https://books.toscrape.com", adapter="books", max_pages=60, interval=max(interval, 3600)
+        )
+    return result
 
 
 def reports_dir() -> Path:
