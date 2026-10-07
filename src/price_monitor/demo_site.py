@@ -13,6 +13,8 @@ from html import escape
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from . import demo_theme
+
 PAGE_SIZE = 5
 
 
@@ -88,12 +90,44 @@ def write_scenario(state_file: Path, name: str) -> None:
 
 def render_card(item: Item, scenario: str) -> str:
     card_class = "item" if scenario == "changed_template" else "product"
-    stock = {"in": "In stock", "out": "Out of stock"}.get(item.stock or "", "")
-    stock_html = f'<span class="stock">{stock}</span>' if stock else ""
+    if item.stock == "in":
+        stock_html = '<span class="stock">In stock</span>'
+    elif item.stock == "out":
+        stock_html = '<span class="stock out">Out of stock</span>'
+    else:
+        # No .stock element on purpose: the adapter must report UNKNOWN, not OUT_OF_STOCK.
+        stock_html = '<span class="nostock">Availability not shown</span>'
+    base = next((b.price for b in BASE_CATALOG if b.sku == item.sku), item.price)
+    was = f'<s class="was">{base}</s>' if base != item.price else ""
+    flag = '<span class="flag">Price changed</span>' if was else ""
+    sku, name = escape(item.sku), escape(item.name)
     return (
-        f'<article class="{card_class}" data-sku="{escape(item.sku)}">'
-        f'<h2><a href="/product/{escape(item.sku)}">{escape(item.name)}</a></h2>'
-        f'<span class="price" data-currency="USD">{item.price}</span>{stock_html}</article>'
+        f'<article class="{card_class}" data-sku="{sku}">{flag}'
+        f'<a href="/product/{sku}"><img src="/img/{sku}.svg" alt="{name}"></a>'
+        f'<h2><a href="/product/{sku}">{name}</a></h2>'
+        f'<div><span class="price" data-currency="USD">{item.price}</span>{was}</div>{stock_html}</article>'
+    )
+
+
+def layout(body: str, scenario: str) -> str:
+    return (
+        "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width'>"
+        f"<title>Demo Shop</title><style>{demo_theme.CSS}</style></head><body>"
+        "<header><h1>Demo Shop</h1><span>stationery and desk accessories</span></header><main>"
+        '<p class="notice">Test bench of Price Monitor: the shop and its products are fictional. '
+        f"Active scenario: <b>{escape(scenario)}</b>.</p>{body}</main>"
+        "<footer>Prices and stock here are changed on purpose to demonstrate the monitor.</footer></body></html>"
+    )
+
+
+def render_product(item: Item, scenario: str) -> str:
+    stock = {"in": "In stock", "out": "Out of stock"}.get(item.stock or "", "Availability not shown")
+    sku, name = escape(item.sku), escape(item.name)
+    return layout(
+        f'<div class="detail"><img src="/img/{sku}.svg" alt="{name}"><div><h2>{name}</h2>'
+        f'<p>Code: {sku}</p><p class="price">{item.price} USD</p><p>{stock}</p>'
+        '<p><a href="/catalog?page=1">Back to catalog</a></p></div></div>',
+        scenario,
     )
 
 
@@ -109,10 +143,11 @@ def render_page(page: int, scenario: str) -> str | None:
         target = 1 if (scenario == "pagination_cycle" and page == 2) else page + 1
         nxt = f'<a rel="next" href="/catalog?page={target}">Next</a>'
     cards = "\n".join(render_card(i, scenario) for i in chunk)
-    return (
-        "<!doctype html><html><head><meta charset='utf-8'><title>Demo catalog</title></head><body>"
-        f'<p id="total" data-count="{declared}">{declared} products</p>\n{cards}\n'
-        f'<nav>{nxt}</nav></body></html>'
+    prev = f'<a href="/catalog?page={page - 1}">Previous</a>' if page > 1 else "<span></span>"
+    return layout(
+        f'<p id="total" data-count="{declared}">{declared} products, page {page} of {pages}</p>\n'
+        f'<div class="grid">\n{cards}\n</div>\n<nav>{prev}{nxt}</nav>',
+        scenario,
     )
 
 
@@ -121,6 +156,7 @@ def make_handler(state_file: Path):
         def do_GET(self):  # noqa: N802
             scenario = read_scenario(state_file)
             url = urlparse(self.path)
+            content_type = "text/html; charset=utf-8"
             if url.path == "/catalog":
                 try:
                     page = int(parse_qs(url.query).get("page", ["1"])[0])
@@ -129,8 +165,13 @@ def make_handler(state_file: Path):
                 body = None if (scenario == "page_lost" and page == 2) else render_page(page, scenario)
             elif url.path.startswith("/product/"):
                 sku = url.path.removeprefix("/product/")
-                known = any(i.sku == sku for i in catalog_for(scenario))
-                body = f"<html><body>Product {escape(sku)}</body></html>" if known else None
+                item = next((i for i in catalog_for(scenario) if i.sku == sku), None)
+                body = render_product(item, scenario) if item else None
+            elif url.path.startswith("/img/") and url.path.endswith(".svg"):
+                sku = url.path.removeprefix("/img/").removesuffix(".svg")
+                item = next((i for i in catalog_for(scenario) if i.sku == sku), None)
+                body = demo_theme.product_svg(item.sku, item.name) if item else None
+                content_type = "image/svg+xml"
             else:
                 body = None
             if body is None:
@@ -139,7 +180,7 @@ def make_handler(state_file: Path):
                 return
             data = body.encode("utf-8")
             self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)

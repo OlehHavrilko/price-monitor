@@ -29,6 +29,8 @@ docker compose exec monitor price-monitor report --since 2026-01-01 --until 2027
 docker compose cp monitor:/data/reports ./reports
 ```
 
+Screenshots of the running demo catalog: [initial](docs/screenshots/shop-initial.png) and [after `price_drop`](docs/screenshots/shop-price-drop.png).
+
 The second `collect` prints `Events: PRICE_CHANGED x2`. `docker compose exec demo price-monitor demo-scenario` without a name lists all scenarios (price drop, stock changes, lost page, pagination loop, missing products, changed page template, and so on).
 
 ## Local run without Docker
