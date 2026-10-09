@@ -100,12 +100,13 @@ Checked by automated tests (`pytest`, no network, no token): parsing against HTM
 Run by hand:
 
 - `books` live collection: 1000 products from 50 pages, a repeat gave no events.
+- `docker compose up --build` on an aarch64 Ubuntu 24.04 VPS: both containers start, the scenario from the quick start gives the documented result, the database and events survive `down` / `up`.
 - `price-monitor run` without Telegram: scheduled collection works, a second instance is refused.
 
 **Not verified:**
 
 - Real Telegram delivery and polling: no bot token has been used. Only the command logic and error classification are tested, with stand-ins for the network.
-- `docker compose up` and the Docker image: Docker was not available where this was written. `Dockerfile`, `compose.yaml` and the CI workflow have not been run.
+- CI: the GitHub Actions workflow has not been checked yet.
 - The behavior of the `books` site if it changes its markup: a changed template is reported as a failed collection, not as an empty catalog.
 
 ## Limitations
