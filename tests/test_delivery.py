@@ -112,15 +112,15 @@ def queued(conn, n=1):
 def test_successful_delivery_marks_sent_and_is_not_repeated(conn):
     queued(conn)
     sent = []
-    assert outbox.deliver_pending(conn, lambda c, t: sent.append((c, t))).sent == 1
-    assert outbox.deliver_pending(conn, lambda c, t: sent.append((c, t))).sent == 0
+    assert outbox.deliver_pending(conn, lambda c, t, card=None: sent.append((c, t))).sent == 1
+    assert outbox.deliver_pending(conn, lambda c, t, card=None: sent.append((c, t))).sent == 0
     assert sent == [(CHAT, "text 0")]
 
 
 def test_temporary_failure_backs_off_then_gives_up(conn):
     queued(conn)
 
-    def fail(chat, text):
+    def fail(chat, text, card=None):
         raise outbox.TemporaryDeliveryError("timeout")
 
     now = datetime.now(timezone.utc)
@@ -139,7 +139,7 @@ def test_permanent_failure_is_not_retried(conn):
     queued(conn)
     calls = []
 
-    def blocked(chat, text):
+    def blocked(chat, text, card=None):
         calls.append(1)
         raise outbox.PermanentDeliveryError("bot was blocked by the user")
 
@@ -155,7 +155,7 @@ def test_queue_survives_restart(tmp_path):
     first.close()  # "restart"
     second = storage.connect(path)
     sent = []
-    assert outbox.deliver_pending(second, lambda c, t: sent.append(t)).sent == 2
+    assert outbox.deliver_pending(second, lambda c, t, card=None: sent.append(t)).sent == 2
     assert sent == ["text 0", "text 1"]
 
 
@@ -164,7 +164,7 @@ def test_lost_acknowledgement_causes_a_duplicate_but_never_loses_the_message(con
     delivered = []
     state = {"first": True}
 
-    def flaky(chat, text):
+    def flaky(chat, text, card=None):
         delivered.append(text)  # reaches the user...
         if state.pop("first", False):
             raise outbox.TemporaryDeliveryError("timeout waiting for the answer")  # ...but we never learn it

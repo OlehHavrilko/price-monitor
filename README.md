@@ -2,7 +2,31 @@
 
 Monitors prices and stock of products in a few fixed catalogs. It keeps the history in SQLite, sends Telegram alerts for the products you track, and builds XLSX reports.
 
-**Status: release 1 in development.** The code and tests are in place; the demo video, screenshots and a real Telegram delivery check are not done yet (see [Verification](#verification)).
+**Status: release 1 in development.** The code and tests are in place; the demo video and screenshots from a real Telegram chat are not added yet (see [Verification](#verification)).
+
+## What it does
+
+You track products in a shop catalog. The monitor visits the catalog on a schedule, remembers every price and stock status, and tells you in Telegram when something you follow changes. It also builds an XLSX report with the current state and the history.
+
+The demo runs against **Demo Shop**, a small fictional catalog that ships with the project (a test bench whose prices and stock are changed on purpose):
+
+| Before | After the `price_drop` scenario |
+| --- | --- |
+| ![Demo Shop, initial state](docs/screenshots/shop-initial.png) | ![Demo Shop with a changed price](docs/screenshots/shop-price-drop.png) |
+
+The monitor notices the new price and sends a message with a picture card. These cards are produced by the program from a demo run (PNG files created by `cards.py`; Telegram displays the same image with a caption):
+
+| Price dropped | Sold out | Back in stock | Removed from catalog |
+| --- | --- | --- | --- |
+| ![Price drop alert](docs/screenshots/alert-price-drop.png) | ![Out of stock alert](docs/screenshots/alert-out-of-stock.png) | ![Back in stock alert](docs/screenshots/alert-back-in-stock.png) | ![Removed alert](docs/screenshots/alert-removed.png) |
+
+### Play the whole story
+
+`price-monitor demo-play` runs the scenarios one after another with pauses, so it can be screen-recorded: prices drop, an item sells out and comes back, a product disappears and returns, the source breaks and recovers, and a report is written. Each step switches the demo catalog, runs a real collection and lets the service deliver the Telegram messages.
+
+```bash
+docker compose exec monitor price-monitor demo-play --pause 20
+```
 
 Sources in this release:
 
@@ -19,7 +43,7 @@ docker compose up --build
 
 This starts the demo catalog (http://127.0.0.1:8080) and the monitor, which collects it every 60 seconds. No Telegram token and no external network are needed. The database is stored in the `data` volume and survives restarts.
 
-Try a change on the demo catalog:
+Or try one change by hand on the demo catalog:
 
 ```bash
 docker compose exec monitor price-monitor collect demo
@@ -28,8 +52,6 @@ docker compose exec monitor price-monitor collect demo
 docker compose exec monitor price-monitor report --since 2026-01-01 --until 2027-01-01
 docker compose cp monitor:/data/reports ./reports
 ```
-
-Screenshots of the running demo catalog: [initial](docs/screenshots/shop-initial.png) and [after `price_drop`](docs/screenshots/shop-price-drop.png).
 
 The second `collect` prints `Events: PRICE_CHANGED x2`. `docker compose exec demo price-monitor demo-scenario` without a name lists all scenarios (price drop, stock changes, lost page, pagination loop, missing products, changed page template, and so on).
 
@@ -105,7 +127,7 @@ Run by hand:
 
 **Not verified:**
 
-- Real Telegram delivery and polling: no bot token has been used. Only the command logic and error classification are tested, with stand-ins for the network.
+- Real Telegram delivery of the picture cards (`send_photo`) and `/report` files: text alerts and polling were checked against a real bot on the VPS; the photo path is tested only with a stand-in bot.
 - CI: the GitHub Actions workflow has not been checked yet.
 - The behavior of the `books` site if it changes its markup: a changed template is reported as a failed collection, not as an empty catalog.
 

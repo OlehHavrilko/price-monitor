@@ -61,6 +61,25 @@ def cmd_run(args: argparse.Namespace) -> int:
     return asyncio.run(run_service())
 
 
+def cmd_demo_play(args: argparse.Namespace) -> int:
+    from .demo_play import play
+
+    sources = config.sources()
+    if args.source not in sources or sources[args.source].adapter != "demo":
+        print("demo-play works only with the demo source.", file=sys.stderr)
+        return 2
+    db = config.db_path()
+    db.parent.mkdir(parents=True, exist_ok=True)
+    state = config.demo_state_file()
+    state.parent.mkdir(parents=True, exist_ok=True)
+    recipients = config.allowed_ids() if config.telegram_enabled() else ()
+    play(
+        storage.connect(db), sources[args.source], state, config.reports_dir(),
+        recipients=recipients, lock_dir=config.lock_dir(), pause=args.pause,
+    )
+    return 0
+
+
 def cmd_resume_source(args: argparse.Namespace) -> int:
     if args.source not in config.sources():
         print(f"Unknown source '{args.source}'.", file=sys.stderr)
@@ -109,6 +128,11 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("run", help="run the service: schedule, notification delivery and the Telegram bot")
     p.set_defaults(func=cmd_run)
+
+    p = sub.add_parser("demo-play", help="play the demo story with pauses (for screen recording)")
+    p.add_argument("--source", default="demo")
+    p.add_argument("--pause", type=float, default=20.0, help="seconds between steps (default 20)")
+    p.set_defaults(func=cmd_demo_play)
 
     p = sub.add_parser("resume-source", help="allow collection of a source stopped after HTTP 401/403")
     p.add_argument("source")

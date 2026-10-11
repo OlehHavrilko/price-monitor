@@ -6,15 +6,17 @@ Interface text is Ukrainian. Only IDs from the allowlist get answers; everything
 from __future__ import annotations
 
 import asyncio
+import logging
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-from . import outbox, reports, storage
+from . import cards, outbox, reports, storage
 from .models import SourceConfig
 
+log = logging.getLogger("price_monitor")
 MAX_LIST_LINES = 30
 DEFAULT_REPORT_DAYS = 7
 MAX_REPORT_DAYS = 90
@@ -186,12 +188,24 @@ def classify_send_error(exc: BaseException) -> Exception:
 def make_sender(bot, loop: asyncio.AbstractEventLoop, timeout: float = 30.0):
     """Blocking sender for outbox.deliver_pending, to be called from a worker thread."""
 
-    from aiogram.types import LinkPreviewOptions
+    from aiogram.types import BufferedInputFile, LinkPreviewOptions
 
-    def send(chat_id: int, text: str) -> None:
-        future = asyncio.run_coroutine_threadsafe(
-            bot.send_message(chat_id, text, link_preview_options=LinkPreviewOptions(is_disabled=True)), loop
-        )
+    def picture(card: dict | None) -> bytes | None:
+        if not card:
+            return None
+        try:
+            return cards.render_alert_card(card)
+        except Exception:  # a broken picture must not block the alert itself
+            log.exception("Could not render the alert card; sending text only")
+            return None
+
+    def send(chat_id: int, text: str, card: dict | None = None) -> None:
+        png = picture(card)
+        if png:
+            coro = bot.send_photo(chat_id, BufferedInputFile(png, "alert.png"), caption=text)
+        else:
+            coro = bot.send_message(chat_id, text, link_preview_options=LinkPreviewOptions(is_disabled=True))
+        future = asyncio.run_coroutine_threadsafe(coro, loop)
         try:
             future.result(timeout=timeout)
         except Exception as exc:  # every error is classified, none is swallowed

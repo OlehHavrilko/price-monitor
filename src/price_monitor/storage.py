@@ -101,6 +101,8 @@ MIGRATIONS: list[str] = [
         stopped INTEGER NOT NULL DEFAULT 0,
         last_error TEXT
     );
+    """,    """
+    ALTER TABLE notification_outbox ADD COLUMN card TEXT;
     """,
 ]
 
@@ -232,13 +234,16 @@ def _enqueue_product_alerts(
             by_product.setdefault(ev.product_key, []).append(ev)
     for key, evs in by_product.items():
         row = conn.execute(
-            "SELECT p.name, p.url, (SELECT currency FROM observations o WHERE o.source_id = p.source_id "
-            "AND o.product_key = p.product_key ORDER BY o.id DESC LIMIT 1) AS currency "
-            "FROM products p WHERE p.source_id = ? AND p.product_key = ?",
+            "SELECT p.name, p.url, o.currency, o.price, o.availability FROM products p "
+            "LEFT JOIN observations o ON o.id = (SELECT MAX(id) FROM observations "
+            "WHERE source_id = p.source_id AND product_key = p.product_key) "
+            "WHERE p.source_id = ? AND p.product_key = ?",
             (source_id, key),
         ).fetchone()
-        text = notifications.product_message(source_id, key, row["name"], row["url"], row["currency"] or "", evs)
-        outbox.enqueue(conn, recipients, f"{run_id}:{key}", text)
+        currency = row["currency"] or ""
+        text = notifications.product_message(source_id, key, row["name"], row["url"], currency, evs)
+        card = notifications.product_card(source_id, key, row["name"], currency, row["price"], row["availability"], evs)
+        outbox.enqueue(conn, recipients, f"{run_id}:{key}", text, card)
 
 
 def _update_source_health_on_success(

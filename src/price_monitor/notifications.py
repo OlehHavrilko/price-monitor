@@ -46,3 +46,27 @@ def source_failed_message(source_id: str, error: str, stopped: bool) -> str:
 
 def source_recovered_message(source_id: str) -> str:
     return f"Джерело «{source_id}» знову працює."
+
+
+def product_card(
+    source_id: str, key: str, name: str, currency: str, price: str | None, availability: str | None,
+    events: Sequence[Event],
+) -> dict:
+    """Data for the picture attached to a product alert (see cards.render_alert_card)."""
+    types = {e.type for e in events}
+    old_price = next((e.old_value for e in events if e.type in (BELOW_THRESHOLD, PRICE_DROP_PERCENT)), None)
+    if types & {BELOW_THRESHOLD, PRICE_DROP_PERCENT}:
+        headline, tone = "Price drop", "drop"
+    elif REMOVED in types:
+        headline, tone = "Removed from catalog", "removed"
+    elif RETURNED in types:
+        headline, tone = "Back in catalog", "stock"
+    elif availability == "OUT_OF_STOCK":
+        headline, tone = "Out of stock", "out"
+    else:
+        headline, tone = "Back in stock", "stock"
+    stock = {"IN_STOCK": "In stock", "OUT_OF_STOCK": "Out of stock"}.get(availability or "")
+    return {
+        "source": source_id, "key": key, "name": name, "currency": currency, "price": price or "",
+        "old_price": old_price, "headline": headline, "tone": tone, "stock": stock,
+    }

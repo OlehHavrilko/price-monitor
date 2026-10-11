@@ -68,7 +68,7 @@ def test_report_command_returns_a_file_and_validates_days(bot):
 
 def test_status_shows_queue_and_delivery_errors(bot, conn):
     outbox.enqueue(conn, [5], "a", "hello")
-    outbox.deliver_pending(conn, lambda c, t: (_ for _ in ()).throw(outbox.PermanentDeliveryError("chat not found")))
+    outbox.deliver_pending(conn, lambda c, t, card=None: (_ for _ in ()).throw(outbox.PermanentDeliveryError("chat not found")))
     text = bot(OWNER, "/status").text
     assert "помилок доставки 1" in text and "chat not found" in text
 

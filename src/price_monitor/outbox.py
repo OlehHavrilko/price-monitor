@@ -6,6 +6,7 @@ produces a duplicate. Exactly-once delivery is not promised.
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -24,7 +25,8 @@ class TemporaryDeliveryError(Exception):
     """Network error, timeout or server error. The message may or may not have arrived."""
 
 
-Sender = Callable[[int, str], None]
+# send(chat_id, text, card): card is the data for an alert picture, or None for a plain text message.
+Sender = Callable[[int, str, "dict | None"], None]
 
 
 def _now() -> datetime:
@@ -35,14 +37,16 @@ def _iso(moment: datetime) -> str:
     return moment.isoformat(timespec="seconds")
 
 
-def enqueue(conn: sqlite3.Connection, recipients: Sequence[int], dedupe_key: str, text: str) -> None:
+def enqueue(
+    conn: sqlite3.Connection, recipients: Sequence[int], dedupe_key: str, text: str, card: dict | None = None
+) -> None:
     """Add one message per recipient. A repeated dedupe_key for the same chat is ignored."""
     now = _iso(_now())
     for chat_id in recipients:
         conn.execute(
-            "INSERT OR IGNORE INTO notification_outbox(chat_id, dedupe_key, text, status, attempts, "
-            "next_attempt_at, created_at) VALUES (?, ?, ?, 'pending', 0, ?, ?)",
-            (chat_id, dedupe_key, text, now, now),
+            "INSERT OR IGNORE INTO notification_outbox(chat_id, dedupe_key, text, card, status, attempts, "
+            "next_attempt_at, created_at) VALUES (?, ?, ?, ?, 'pending', 0, ?, ?)",
+            (chat_id, dedupe_key, text, json.dumps(card) if card else None, now, now),
         )
 
 
@@ -64,7 +68,7 @@ def deliver_pending(
     sent = retry = failed = 0
     for row in rows:
         try:
-            send(row["chat_id"], row["text"])
+            send(row["chat_id"], row["text"], json.loads(row["card"]) if row["card"] else None)
         except PermanentDeliveryError as exc:
             _mark_failed(conn, row["id"], row["attempts"] + 1, str(exc))
             failed += 1
