@@ -80,3 +80,11 @@ def test_send_errors_are_classified_for_the_outbox():
     assert isinstance(classify_send_error(TelegramBadRequest(method, "Bad Request: message is too long")), outbox.TemporaryDeliveryError)
     assert isinstance(classify_send_error(TelegramNetworkError(method, "timeout")), outbox.TemporaryDeliveryError)
     assert isinstance(classify_send_error(TimeoutError()), outbox.TemporaryDeliveryError)
+
+
+def test_start_explains_the_project_to_anyone_but_only_the_owner_can_manage(bot):
+    stranger = bot(STRANGER, "/start").text
+    assert "Demo Shop" in stranger and "Навіщо" in stranger and "доступне лише власнику" in stranger
+    assert "/track" in stranger and "Доступ заборонено" not in stranger  # explains, does not slam the door
+    owner = bot(OWNER, "/start").text
+    assert "Навіщо" in owner and "/report [магазин] [днів]" in owner

@@ -63,6 +63,8 @@ async def run_service() -> int:
         else:
             log.info("Telegram is off: set TELEGRAM_BOT_TOKEN and TELEGRAM_ALLOWED_IDS to enable it.")
 
+        if bot:
+            await _set_bot_profile(bot)
         scheduler = build_scheduler(deliver)
         scheduler.start()
         try:
@@ -77,6 +79,20 @@ async def run_service() -> int:
         return 0
     finally:
         lock.release()
+
+
+async def _set_bot_profile(bot) -> None:
+    """Texts shown on the bot's own page before the first message. A failure here is not fatal."""
+    from aiogram.types import BotCommand
+
+    from .telegram import BOT_COMMANDS, BOT_DESCRIPTION, BOT_SHORT_DESCRIPTION
+
+    try:
+        await bot.set_my_description(BOT_DESCRIPTION)
+        await bot.set_my_short_description(BOT_SHORT_DESCRIPTION)
+        await bot.set_my_commands([BotCommand(command=c, description=d) for c, d in BOT_COMMANDS])
+    except Exception:
+        log.exception("Could not update the bot description")
 
 
 def _build_bot():

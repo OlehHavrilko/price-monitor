@@ -59,13 +59,13 @@ def collect_once(
             with make_client(source, transport) as client:
                 items = fetch_snapshot(client, source)  # no DB transaction is open here
         except CollectionError as exc:
-            storage.record_failure(conn, run_id, source.id, exc.reason, exc.fatal, recipients)
+            storage.record_failure(conn, run_id, source.id, exc.reason, exc.fatal, recipients, source.title)
             return RunResult(run_id, False, error=exc.reason, fatal=exc.fatal)
         except Exception as exc:  # unexpected bug: record it, never report an empty success
             reason = f"Unexpected error: {type(exc).__name__}: {exc}"
-            storage.record_failure(conn, run_id, source.id, reason, False, recipients)
+            storage.record_failure(conn, run_id, source.id, reason, False, recipients, source.title)
             return RunResult(run_id, False, error=reason)
-        events = storage.commit_snapshot(conn, run_id, source.id, items, recipients)
+        events = storage.commit_snapshot(conn, run_id, source.id, items, recipients, source.title)
         return RunResult(run_id, True, product_count=len(items), events=tuple(events))
     finally:
         if file_lock:

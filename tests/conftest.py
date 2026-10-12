@@ -21,6 +21,6 @@ def conn(tmp_path):
 
 
 def make_source(url: str, **overrides) -> SourceConfig:
-    params = dict(id="demo", base_url=url, adapter="demo", page_delay=0, retries=1, retry_backoff=0)
+    params = dict(id="demo", base_url=url, adapter="demo", page_delay=0, retries=1, retry_backoff=0, title="Demo Shop", description="test shop")
     params.update(overrides)
     return SourceConfig(**params)

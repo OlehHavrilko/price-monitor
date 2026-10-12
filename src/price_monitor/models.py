@@ -23,6 +23,8 @@ class SourceConfig:
     retries: int = 2
     retry_backoff: float = 1.0
     interval: int = 3600  # seconds between scheduled collections
+    title: str = ""  # shown to the user in Telegram
+    description: str = ""
 
 
 @dataclass(frozen=True)

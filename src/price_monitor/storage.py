@@ -226,11 +226,12 @@ def _enqueue_product_alerts(
     source_id: str,
     recipients: Sequence[int],
     events: list[comparison.Event],
-    tracked: set[str],
+    rules: dict[str, comparison.Rule],
+    source_title: str | None,
 ) -> None:
     by_product: dict[str, list[comparison.Event]] = {}
     for ev in events:
-        if ev.product_key in tracked and ev.type in notifications.NOTIFIABLE:
+        if ev.product_key in rules and ev.type in notifications.NOTIFIABLE:
             by_product.setdefault(ev.product_key, []).append(ev)
     for key, evs in by_product.items():
         row = conn.execute(
@@ -241,17 +242,19 @@ def _enqueue_product_alerts(
             (source_id, key),
         ).fetchone()
         currency = row["currency"] or ""
-        text = notifications.product_message(source_id, key, row["name"], row["url"], currency, evs)
+        text = notifications.product_message(
+            source_id, key, row["name"], row["url"], currency, evs, rules[key], source_title
+        )
         card = notifications.product_card(source_id, key, row["name"], currency, row["price"], row["availability"], evs)
         outbox.enqueue(conn, recipients, f"{run_id}:{key}", text, card)
 
 
 def _update_source_health_on_success(
-    conn: sqlite3.Connection, source_id: str, run_id: int, recipients: Sequence[int]
+    conn: sqlite3.Connection, source_id: str, run_id: int, recipients: Sequence[int], source_title: str | None
 ) -> None:
     row = conn.execute("SELECT alerted FROM source_health WHERE source_id = ?", (source_id,)).fetchone()
     if row and row["alerted"]:
-        outbox.enqueue(conn, recipients, f"{run_id}:recovered", notifications.source_recovered_message(source_id))
+        outbox.enqueue(conn, recipients, f"{run_id}:recovered", notifications.source_recovered_message(source_id, source_title))
     conn.execute(
         "INSERT INTO source_health(source_id, alerted, stopped, last_error) VALUES (?, 0, 0, NULL) "
         "ON CONFLICT(source_id) DO UPDATE SET alerted = 0, last_error = NULL",
@@ -266,6 +269,7 @@ def record_failure(
     error: str,
     fatal: bool = False,
     recipients: Sequence[int] = (),
+    source_title: str | None = None,
 ) -> None:
     """Close a run as failed. The operator is told once per outage, not on every failed cycle."""
     conn.execute("BEGIN IMMEDIATE")
@@ -274,7 +278,7 @@ def record_failure(
         row = conn.execute("SELECT alerted FROM source_health WHERE source_id = ?", (source_id,)).fetchone()
         if not (row and row["alerted"]):
             outbox.enqueue(
-                conn, recipients, f"{run_id}:failed", notifications.source_failed_message(source_id, error, fatal)
+                conn, recipients, f"{run_id}:failed", notifications.source_failed_message(source_id, error, fatal, source_title)
             )
         conn.execute(
             "INSERT INTO source_health(source_id, alerted, stopped, last_error) VALUES (?, 1, ?, ?) "
@@ -303,6 +307,7 @@ def commit_snapshot(
     source_id: str,
     items: list[ProductObservation],
     recipients: Sequence[int] = (),
+    source_title: str | None = None,
 ) -> list[comparison.Event]:
     """Save a validated snapshot, its events, queued notifications and the run result in one transaction."""
     now = utcnow()
@@ -348,8 +353,8 @@ def commit_snapshot(
                 "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (run_id, source_id, ev.product_key, ev.type, ev.old_value, ev.new_value, now),
             )
-        _enqueue_product_alerts(conn, run_id, source_id, recipients, events, set(rules))
-        _update_source_health_on_success(conn, source_id, run_id, recipients)
+        _enqueue_product_alerts(conn, run_id, source_id, recipients, events, rules, source_title)
+        _update_source_health_on_success(conn, source_id, run_id, recipients, source_title)
         conn.execute(
             "UPDATE collection_runs SET status = 'success', finished_at = ?, product_count = ? WHERE id = ?",
             (now, len(items), run_id),

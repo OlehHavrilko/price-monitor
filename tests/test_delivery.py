@@ -32,6 +32,8 @@ def test_tracked_product_alert_is_one_message_listing_all_reasons(demo, conn):
     assert len(texts) == 1  # 01003 also dropped, but nobody tracks it
     assert "Desk lamp Nord" in texts[0] and "нижче заданого порогу" in texts[0] and "знизилась" in texts[0]
     assert "24.90 → 19.90" in texts[0]
+    assert "ваше правило: від 15%" in texts[0] and "ваше правило: нижче 20" in texts[0]
+    assert "Магазин: Demo Shop" in texts[0] and "/untrack demo 00123" in texts[0]
     assert collect(conn, demo, "price_drop").events == ()  # unchanged repeat: no new messages
     assert len(messages(conn)) == 1
 
@@ -66,7 +68,7 @@ def test_source_outage_is_reported_once_and_recovery_once(demo, conn):
     collect(conn, demo)
     for _ in range(3):
         assert not collect(conn, demo, "changed_template").ok
-    assert len(messages(conn)) == 1 and "недоступне" in messages(conn)[0]
+    assert len(messages(conn)) == 1 and "недоступний" in messages(conn)[0]
     assert collect(conn, demo, "initial").ok
     assert len(messages(conn)) == 2 and "знову працює" in messages(conn)[1]
     assert collect(conn, demo).ok

@@ -21,15 +21,50 @@ MAX_LIST_LINES = 30
 DEFAULT_REPORT_DAYS = 7
 MAX_REPORT_DAYS = 90
 
-HELP = """Команди:
-/sources — джерела та стан останнього збору
-/products <джерело> — товари з останнього знімка
+BOT_SHORT_DESCRIPTION = "Стежить за цінами й наявністю товарів і пише, коли вони змінюються. Демо на вигаданому магазині."
+BOT_DESCRIPTION = (
+    "Price Monitor — демонстраційний проєкт. Бот стежить за цінами й наявністю товарів у каталозі магазину "
+    "і надсилає повідомлення, коли щось змінилося: товар подешевшав, закінчився, з'явився знову або зник з каталогу. "
+    "Приклад: у вигаданому магазині Demo Shop лампа подешевшала з 24.90 до 19.90 USD — бот пише про це "
+    "з карткою товару. Натисніть «Почати», щоб дізнатися більше. Магазин і товари вигадані."
+)
+BOT_COMMANDS = [
+    ("sources", "Магазини й стан останньої перевірки"),
+    ("products", "Товари з останньої перевірки"),
+    ("tracked", "Що відстежується"),
+    ("track", "Відстежувати товар"),
+    ("untrack", "Припинити відстеження"),
+    ("report", "XLSX-звіт зі змінами"),
+    ("status", "Черга сповіщень і помилки"),
+    ("help", "Що це і як користуватися"),
+]
+
+COMMANDS_HELP = """Команди:
+/sources — магазини та стан останньої перевірки
+/products <магазин> — товари з останньої перевірки
 /tracked — що відстежується
-/track <джерело> <код> [below=ціна] [drop=відсотки] — відстежувати товар
-/untrack <джерело> <код> — припинити відстеження
-/report [джерело] [днів] — XLSX-звіт (за замовчуванням 7 днів, не більше 90)
+/track <магазин> <код> [below=ціна] [drop=відсотки] — відстежувати товар
+/untrack <магазин> <код> — припинити відстеження
+/report [магазин] [днів] — XLSX-звіт (за замовчуванням 7 днів, не більше 90)
 /status — черга сповіщень і помилки доставки
 Код товару — рядок, ведучі нулі важливі: 00123 і 123 різні товари."""
+
+
+def about_text(sources: dict[str, SourceConfig]) -> str:
+    shops = "\n".join(f"• {s.title or s.id} — {s.description}" for s in sources.values())
+    return (
+        "Price Monitor стежить за цінами та наявністю товарів в інтернет-каталозі й повідомляє, коли щось змінилося.\n\n"
+        "Навіщо: не відкривати сайт вручну й не пропустити зниження ціни чи появу товару. Ви обираєте товари "
+        "командою /track, сервіс сам перевіряє каталог за розкладом і пише лише про значущі зміни: ціна впала, "
+        "товар закінчився чи з'явився знову, зник з каталогу. Якщо сайт змінився й сторінки не читаються, "
+        "сервіс не вигадує зміни, а повідомляє про несправність.\n\n"
+        f"Що перевіряється зараз:\n{shops}\n\n"
+        "У повідомленні: назва товару, магазин, що змінилося (було → стало), чому ви його отримали й посилання. "
+        "Для зниження ціни додається картка з картинкою. За запитом формується XLSX-звіт з історією змін.\n\n"
+    )
+
+
+HELP = COMMANDS_HELP
 
 
 @dataclass(frozen=True)
@@ -79,18 +114,25 @@ def handle_command(
     allowed_ids: tuple[int, ...],
     reports_dir: Path,
 ) -> Reply:
-    if user_id not in allowed_ids:
-        return Reply("Доступ заборонено.")
     parts = text.strip().split()
-    if not parts or not parts[0].startswith("/"):
-        return Reply(HELP)
-    command, args = parts[0].split("@")[0].lower(), parts[1:]
+    command = parts[0].split("@")[0].lower() if parts and parts[0].startswith("/") else ""
+    args = parts[1:]
+    if user_id not in allowed_ids:
+        if command in ("/start", "/help"):
+            return Reply(
+                about_text(sources)
+                + "Керування (відстеження, звіти) доступне лише власнику бота. "
+                "Як це виглядає в роботі — у README проєкту та в демонстраційному відео."
+            )
+        return Reply("Доступ заборонено.")
+    if not command:
+        return Reply(COMMANDS_HELP)
 
     def known_source(arg: str) -> SourceConfig | None:
         return sources.get(arg)
 
     if command in ("/start", "/help"):
-        return Reply(HELP)
+        return Reply(about_text(sources) + COMMANDS_HELP)
 
     if command == "/sources":
         return Reply("\n".join(_source_line(conn, s) for s in sources))

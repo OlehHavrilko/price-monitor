@@ -6,9 +6,15 @@ Monitors prices and stock of products in a few fixed catalogs. It keeps the hist
 
 ## What it does
 
-You track products in a shop catalog. The monitor visits the catalog on a schedule, remembers every price and stock status, and tells you in Telegram when something you follow changes. It also builds an XLSX report with the current state and the history.
+**The problem.** Prices and availability in online shops change all the time, and checking them by hand means opening the same pages again and again. Typical cases: waiting for a price to fall below a number, knowing the moment an out-of-stock item returns, or watching a supplier's or competitor's catalog for removed and repriced products.
 
-The demo runs against **Demo Shop**, a small fictional catalog that ships with the project (a test bench whose prices and stock are changed on purpose):
+**What it does.** You pick the products to follow. The service visits the shop's catalog on a schedule, remembers every price and stock status, and sends a Telegram message only when something you follow changes: the price fell (below your limit or by your percentage), the item sold out or came back, it disappeared from the catalog or returned. A message says which shop and product, what changed (was → now), why you received it, and how to turn it off. On request it builds an XLSX report with the current state and the history of changes.
+
+**What it is careful about.** It does not report changes it is not sure about. If a page fails to load, the layout changed, or the catalog looks incomplete, nothing is recorded and you are told the shop is unavailable, instead of getting "all products disappeared". A product counts as removed only after two complete checks in a row without it.
+
+**What it watches here.** The demo uses **Demo Shop**, a fictional shop that ships with the project (a test bench: its prices and stock are changed on purpose, so the reactions are visible). A second adapter reads a public practice site, books.toscrape.com. Real shops are not part of this release: for any real site the access terms must be checked first.
+
+How the demo shop looks:
 
 | Before | After the `price_drop` scenario |
 | --- | --- |
@@ -22,7 +28,7 @@ The monitor notices the new price and sends a message with a picture card. These
 
 ### Play the whole story
 
-`price-monitor demo-play` runs the scenarios one after another with pauses, so it can be screen-recorded: prices drop, an item sells out and comes back, a product disappears and returns, the source breaks and recovers, and a report is written. Each step switches the demo catalog, runs a real collection and lets the service deliver the Telegram messages.
+`price-monitor demo-play` runs the scenarios one after another with pauses, so it can be screen-recorded: prices drop, an item sells out and comes back, a product disappears and returns, the source breaks and recovers, and a report is written. Each step switches the demo catalog, runs a real collection and lets the service deliver the Telegram messages. Before every step the bot also sends a short explanation of what just happened in the shop (the only messages that are not alerts), so a viewer who joins the chat cold can follow the story. The bot's own page and `/start` explain what the project is and what it watches.
 
 ```bash
 docker compose exec monitor price-monitor demo-play --pause 20

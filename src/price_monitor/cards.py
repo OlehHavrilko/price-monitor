@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 import io
-from decimal import Decimal, InvalidOperation
 
 from PIL import Image, ImageDraw, ImageFont
 
 from . import glyphs
+from .notifications import drop_percent
 
 WIDTH, HEIGHT = 900, 460
 BG, INK, MUTED = "#f4f1ea", "#2b2a27", "#6b6b66"
@@ -15,16 +15,6 @@ BADGE_COLORS = {"drop": "#2e7d32", "up": "#b3261e", "stock": "#1d5fa8", "out": "
 
 def _font(size: int):
     return ImageFont.load_default(size=size)
-
-
-def drop_percent(old: str | None, new: str | None) -> Decimal | None:
-    try:
-        o, n = Decimal(old), Decimal(new)
-    except (InvalidOperation, TypeError):
-        return None
-    if o <= 0 or n >= o:
-        return None
-    return ((o - n) / o * 100).quantize(Decimal("0.1"))
 
 
 def render_alert_card(card: dict) -> bytes:
