@@ -37,7 +37,9 @@ def render_alert_card(card: dict) -> bytes:
     currency = card.get("currency", "")
     old, new = card.get("old_price"), card["price"]
     price_y = 215
-    if old and old != new:
+    if not new:
+        d.text((x, price_y), "no price shown", font=_font(44), fill=MUTED)
+    elif old and old != new:
         was = f"was {old} {currency}"
         d.text((x, 175), was, font=_font(30), fill=MUTED)
         d.line([(x + d.textlength("was ", font=_font(30)), 192), (x + d.textlength(was, font=_font(30)), 192)], fill=MUTED, width=3)

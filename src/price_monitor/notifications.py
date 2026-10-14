@@ -38,7 +38,8 @@ def _reason(ev: Event, currency: str, rule: Rule | None) -> str:
     if ev.type == REMOVED:
         return "товар зник з каталогу (підтверджено двома повними перевірками підряд)"
     if ev.type == RETURNED:
-        return f"товар знову є в каталозі, ціна {ev.new_value} {currency}"
+        price = f", ціна {ev.new_value} {currency}" if ev.new_value else ""
+        return f"товар знову є в каталозі{price}"
     raise ValueError(f"Not a notifiable event: {ev.type}")
 
 

@@ -56,7 +56,7 @@ def _current_rows(conn: sqlite3.Connection, source_id: str) -> list[list]:
     ).fetchall()
     return [
         [
-            r["source_id"], r["product_key"], r["name"], r["url"], Decimal(r["price"]), r["currency"],
+            r["source_id"], r["product_key"], r["name"], r["url"], Decimal(r["price"]) if r["price"] is not None else None, r["currency"],
             "REMOVED" if r["removed"] else r["availability"], _parse_time(r["observed_at"]),
         ]
         for r in rows

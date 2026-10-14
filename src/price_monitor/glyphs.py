@@ -30,6 +30,7 @@ GLYPHS: dict[str, list[Primitive]] = {
     ],
     "stand": [("rect", 30, 30, 60, 38, 3), ("line", [(60, 68), (60, 88)]), ("line", [(44, 92), (76, 92)])],
     "webcam": [("circle", 60, 46, 20), ("circle", 60, 46, 8), ("line", [(60, 66), (60, 86)]), ("line", [(44, 92), (76, 92)])],
+    "band": [("rect", 46, 16, 28, 26, 4), ("rect", 40, 42, 40, 36, 8), ("rect", 46, 78, 28, 26, 4), ("line", [(52, 54), (68, 54)]), ("line", [(52, 66), (62, 66)])],
     "generic": [("rect", 34, 38, 52, 44, 4)],
 }
 
@@ -37,7 +38,7 @@ GLYPHS: dict[str, list[Primitive]] = {
 KEYWORDS = [
     ("lamp", "lamp"), ("notebook", "notebook"), ("pen", "pen"), ("chair", "chair"), ("hub", "hub"),
     ("cable organiser", "cable"), ("cable", "cable"), ("mouse", "mouse"), ("keyboard", "keyboard"),
-    ("stand", "stand"), ("webcam", "webcam"),
+    ("stand", "stand"), ("webcam", "webcam"), ("браслет", "band"), ("band", "band"), ("фітнес", "band"),
 ]
 
 

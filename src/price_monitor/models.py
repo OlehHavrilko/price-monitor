@@ -33,7 +33,7 @@ class ProductObservation:
     product_key: str
     name: str
     url: str
-    price: Decimal
+    price: Decimal | None  # None: the page shows no price (for example "order on request")
     currency: str
     availability: Availability
 

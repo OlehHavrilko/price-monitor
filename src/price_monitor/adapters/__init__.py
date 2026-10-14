@@ -5,11 +5,12 @@ from collections.abc import Callable
 import httpx
 
 from ..models import CollectionError, ProductObservation, SourceConfig
-from . import books, demo
+from . import allo, books, demo
 
 ADAPTERS: dict[str, Callable[[httpx.Client, SourceConfig], list[ProductObservation]]] = {
     "demo": demo.fetch_snapshot,
     "books": books.fetch_snapshot,
+    "allo": allo.fetch_snapshot,
 }
 
 

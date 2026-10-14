@@ -103,6 +103,24 @@ MIGRATIONS: list[str] = [
     );
     """,    """
     ALTER TABLE notification_outbox ADD COLUMN card TEXT;
+    """,    """
+    CREATE TABLE observations_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id INTEGER NOT NULL REFERENCES collection_runs(id),
+        source_id TEXT NOT NULL,
+        product_key TEXT NOT NULL,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL,
+        price TEXT,
+        currency TEXT NOT NULL,
+        availability TEXT NOT NULL CHECK (availability IN ('IN_STOCK', 'OUT_OF_STOCK', 'UNKNOWN')),
+        observed_at TEXT NOT NULL,
+        UNIQUE (run_id, product_key),
+        FOREIGN KEY (source_id, product_key) REFERENCES products(source_id, product_key)
+    );
+    INSERT INTO observations_new SELECT * FROM observations;
+    DROP TABLE observations;
+    ALTER TABLE observations_new RENAME TO observations;
     """,
 ]
 
@@ -189,7 +207,7 @@ def _row_to_observation(r: sqlite3.Row) -> ProductObservation:
         product_key=r["product_key"],
         name=r["name"],
         url=r["url"],
-        price=Decimal(r["price"]),
+        price=Decimal(r["price"]) if r["price"] is not None else None,
         currency=r["currency"],
         availability=Availability(r["availability"]),
     )
@@ -334,7 +352,7 @@ def commit_snapshot(
                     item.product_key,
                     item.name,
                     item.url,
-                    str(item.price),
+                    None if item.price is None else str(item.price),
                     item.currency,
                     item.availability.value,
                     now,

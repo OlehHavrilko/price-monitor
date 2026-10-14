@@ -9,8 +9,8 @@ import httpx
 from ..http import get_page
 from ..models import CollectionError, ProductObservation, SourceConfig
 
-# parse_page(html, page_url) -> (declared total, products on the page, next page URL or None)
-PageParser = Callable[[str, str], tuple[int, list[ProductObservation], "str | None"]]
+# parse_page(html, page_url) -> (declared total or None, products on the page, next page URL or None)
+PageParser = Callable[[str, str], tuple["int | None", list[ProductObservation], "str | None"]]
 
 
 def _same_origin(base: str, url: str) -> bool:
@@ -43,14 +43,15 @@ def collect_pages(
         seen_pages.add(url)
 
         declared, items, url = parse_page(get_page(client, source, url), url)
-        if declared_total is not None and declared != declared_total:
-            raise CollectionError("Declared product count changed between pages")
-        declared_total = declared
+        if declared is not None:
+            if declared_total is not None and declared != declared_total:
+                raise CollectionError("Declared product count changed between pages")
+            declared_total = declared
         for item in items:
             if item.product_key in products:
                 raise CollectionError(f"Duplicate product key '{item.product_key}' in one snapshot")
             products[item.product_key] = item
 
-    if declared_total != len(products):
+    if declared_total is not None and declared_total != len(products):
         raise CollectionError(f"Collected {len(products)} products, source declares {declared_total}")
     return list(products.values())

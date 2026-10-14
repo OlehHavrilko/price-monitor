@@ -97,8 +97,10 @@ async def _set_bot_profile(bot) -> None:
 
 def _build_bot():
     from aiogram import Bot, Dispatcher
-    from aiogram.types import FSInputFile, Message
+    from aiogram.exceptions import TelegramBadRequest
+    from aiogram.types import CallbackQuery, FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
+    from . import menu
     from .telegram import handle_command, make_sender
 
     bot = Bot(config.telegram_token())
@@ -116,14 +118,48 @@ def _build_bot():
         finally:
             conn.close()
 
+    def press(user_id: int, data: str):
+        conn = storage.connect(config.db_path())
+        try:
+            return menu.handle_callback(
+                conn, user_id, data, sources=config.sources(), allowed_ids=config.allowed_ids(),
+                reports_dir=config.reports_dir(),
+            )
+        finally:
+            conn.close()
+
+    def keyboard(rows):
+        if not rows:
+            return None
+        return InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text=b.label, callback_data=b.data, url=b.url) for b in row] for row in rows
+            ]
+        )
+
     @dispatcher.message()
     async def on_message(message: Message) -> None:
         if message.from_user is None or message.text is None:
             return
         reply = await asyncio.to_thread(handle, message.from_user.id, message.text)
-        await message.answer(reply.text)
+        await message.answer(reply.text, reply_markup=keyboard(reply.buttons))
         if reply.file:
             await message.answer_document(FSInputFile(reply.file))
+
+    @dispatcher.callback_query()
+    async def on_button(call: CallbackQuery) -> None:
+        if call.data is None or call.message is None:
+            await call.answer()
+            return
+        view = await asyncio.to_thread(press, call.from_user.id, call.data)
+        try:
+            await call.message.edit_text(view.text, reply_markup=keyboard(view.rows))
+        except TelegramBadRequest as exc:  # pressing a button that leads to the same screen
+            if "message is not modified" not in str(exc):
+                raise
+        if view.file:
+            await call.message.answer_document(FSInputFile(view.file))
+        await call.answer()
 
     def deliver_job() -> None:
         conn = storage.connect(config.db_path())

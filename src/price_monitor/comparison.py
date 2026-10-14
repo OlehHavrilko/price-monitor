@@ -56,7 +56,7 @@ def compare(
     for key, cur in current.items():
         state = states.get(key, ProductState())
         if state.removed:
-            events.append(Event(key, RETURNED, None, str(cur.price)))
+            events.append(Event(key, RETURNED, None, _text(cur.price)))
         elif key in previous:
             events.extend(_changes(previous[key], cur, rules.get(key)))
         new_states[key] = ProductState()
@@ -76,12 +76,17 @@ def compare(
     return events, new_states
 
 
+def _text(price: Decimal | None) -> str | None:
+    return None if price is None else str(price)
+
+
 def _changes(old: ProductObservation, new: ProductObservation, rule: Rule | None) -> list[Event]:
     key = new.product_key
     events: list[Event] = []
     if old.price != new.price:
-        events.append(Event(key, PRICE_CHANGED, str(old.price), str(new.price)))
-        if rule is not None:
+        events.append(Event(key, PRICE_CHANGED, _text(old.price), _text(new.price)))
+        # Rules need two real prices; a price that appears or disappears is history only.
+        if rule is not None and old.price is not None and new.price is not None:
             if rule.threshold is not None and old.price >= rule.threshold > new.price:
                 events.append(Event(key, BELOW_THRESHOLD, str(old.price), str(new.price)))
             # Decimal arithmetic only. A zero previous price has no percentage, so it never matches.

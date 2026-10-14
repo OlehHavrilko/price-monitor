@@ -12,7 +12,9 @@ Monitors prices and stock of products in a few fixed catalogs. It keeps the hist
 
 **What it is careful about.** It does not report changes it is not sure about. If a page fails to load, the layout changed, or the catalog looks incomplete, nothing is recorded and you are told the shop is unavailable, instead of getting "all products disappeared". A product counts as removed only after two complete checks in a row without it.
 
-**What it watches here.** The demo uses **Demo Shop**, a fictional shop that ships with the project (a test bench: its prices and stock are changed on purpose, so the reactions are visible). A second adapter reads a public practice site, books.toscrape.com. Real shops are not part of this release: for any real site the access terms must be checked first.
+**What it watches.** A real shop: the *Fitness bands* category of [allo.ua](https://allo.ua), a Ukrainian electronics store (about 160 products on 3 pages, read as plain HTML, one collection every 6 hours with a 3-second pause between pages). Real prices change on their own schedule, so alerts from it arrive when the shop really changes something.
+
+To show every kind of reaction on demand (price drop, sold out, product removed, shop broken) there is also **Demo Shop**, a fictional shop that ships with the project. It is a test bench whose prices and stock are changed by a script, so the whole story can be played and recorded. Messages from the real shop and from the test bench look the same.
 
 How the demo shop looks:
 
@@ -36,6 +38,7 @@ docker compose exec monitor price-monitor demo-play --pause 20
 
 Sources in this release:
 
+- `allo` — one category of [allo.ua](https://allo.ua) (fitness bands), a real shop. Switched on with `PRICE_MONITOR_ENABLE_ALLO=1`. Stock is inferred from the card's button ("Купити" → in stock, "Повідомити про наявність" → out of stock, "Замовити" with no price → unknown). Cards without a price are kept with no price.
 - `demo` — a small local catalog that ships with the project, a **test bench**: its prices and stock are changed on purpose to show how the monitor reacts.
 - `books` — [books.toscrape.com](https://books.toscrape.com), a public practice site. Its prices and stock never change, so live collection there shows only parsing and pagination. Off by default.
 
@@ -93,6 +96,10 @@ Set both `TELEGRAM_BOT_TOKEN` and `TELEGRAM_ALLOWED_IDS` (comma-separated numeri
 
 Product keys are strings: `00123` and `123` are different products.
 
+### Buttons
+
+`/start` and `/menu` open a button menu, so commands are rarely needed: **Shops** → a shop (its products, 8 per page, and 1-day / 7-day reports) → a product card (price, stock, link to the shop, **Track** / **Stop tracking**), **Tracked**, **XLSX report**, **Service status**, **About**. Typing part of a product name or its code searches all shops. The presets on a product card are "alert if the price falls by 10% or more" and "only stock changes and removal"; other thresholds (`below=`, `drop=`) are set with `/track`.
+
 Alerts are sent only for tracked products, one message per product and collection, listing every reason that fired: price crossed below `below`, price fell by at least `drop` percent, stock changed between IN_STOCK and OUT_OF_STOCK, the product was confirmed removed, or it came back. A source outage is reported once, and its recovery once.
 
 ## How changes are decided
@@ -128,6 +135,7 @@ Checked by automated tests (`pytest`, no network, no token): parsing against HTM
 Run by hand:
 
 - `books` live collection: 1000 products from 50 pages, a repeat gave no events.
+- `allo` live collection: 164 products from 3 pages (141 in stock, 17 out of stock, 6 priceless "order" cards).
 - `docker compose up --build` on an aarch64 Ubuntu 24.04 VPS: both containers start, the scenario from the quick start gives the documented result, the database and events survive `down` / `up`.
 - `price-monitor run` without Telegram: scheduled collection works, a second instance is refused.
 
@@ -145,6 +153,8 @@ Run by hand:
 - Stock is only IN_STOCK / OUT_OF_STOCK / UNKNOWN; exact quantities are not read.
 - The demo catalog has one currency; `books` prices are GBP. There is no conversion.
 - Single process, single machine. No distributed queue.
+- **allo.ua:** its robots.txt allows generic crawlers on category pages and the volume is low (3 pages every 6 hours, 3 s apart, an identifying User-Agent with the project URL), but the shop's terms of service have **not** been reviewed by the author. Check them before running this against allo.ua for anything beyond a personal demo. The adapter depends on the shop's page layout; a layout change makes collections fail and the bot says so, it does not guess. The page gives no product total, so completeness rests on the pager and equal page sizes.
+- The shop shows no stock count on listing cards, so "in stock" means "the Buy button is shown".
 
 ## License
 

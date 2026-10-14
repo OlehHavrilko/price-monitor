@@ -55,7 +55,7 @@ def test_keys_keep_leading_zeros_and_unknown_input_is_rejected(bot, conn):
 def test_lists_show_last_success_time_and_state(bot):
     assert "працює" in bot(OWNER, "/sources").text
     products = bot(OWNER, "/products demo").text
-    assert "00123 — Desk lamp Nord — 24.90 USD — IN_STOCK" in products and "останній успішний збір" in products
+    assert "00123 — Desk lamp Nord — 24.90 USD — IN_STOCK" in products and "остання успішна перевірка" in products
 
 
 def test_report_command_returns_a_file_and_validates_days(bot):
@@ -85,6 +85,6 @@ def test_send_errors_are_classified_for_the_outbox():
 def test_start_explains_the_project_to_anyone_but_only_the_owner_can_manage(bot):
     stranger = bot(STRANGER, "/start").text
     assert "Demo Shop" in stranger and "Навіщо" in stranger and "доступне лише власнику" in stranger
-    assert "/track" in stranger and "Доступ заборонено" not in stranger  # explains, does not slam the door
+    assert "Доступ заборонено" not in stranger  # explains, does not slam the door
     owner = bot(OWNER, "/start").text
     assert "Навіщо" in owner and "/report [магазин] [днів]" in owner

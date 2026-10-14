@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-from . import cards, outbox, reports, storage
+from . import cards, menu, outbox, reports, storage
 from .models import SourceConfig
 
 log = logging.getLogger("price_monitor")
@@ -29,6 +29,7 @@ BOT_DESCRIPTION = (
     "з карткою товару. Натисніть «Почати», щоб дізнатися більше. Магазин і товари вигадані."
 )
 BOT_COMMANDS = [
+    ("menu", "Головне меню"),
     ("sources", "Магазини й стан останньої перевірки"),
     ("products", "Товари з останньої перевірки"),
     ("tracked", "Що відстежується"),
@@ -50,20 +51,6 @@ COMMANDS_HELP = """Команди:
 Код товару — рядок, ведучі нулі важливі: 00123 і 123 різні товари."""
 
 
-def about_text(sources: dict[str, SourceConfig]) -> str:
-    shops = "\n".join(f"• {s.title or s.id} — {s.description}" for s in sources.values())
-    return (
-        "Price Monitor стежить за цінами та наявністю товарів в інтернет-каталозі й повідомляє, коли щось змінилося.\n\n"
-        "Навіщо: не відкривати сайт вручну й не пропустити зниження ціни чи появу товару. Ви обираєте товари "
-        "командою /track, сервіс сам перевіряє каталог за розкладом і пише лише про значущі зміни: ціна впала, "
-        "товар закінчився чи з'явився знову, зник з каталогу. Якщо сайт змінився й сторінки не читаються, "
-        "сервіс не вигадує зміни, а повідомляє про несправність.\n\n"
-        f"Що перевіряється зараз:\n{shops}\n\n"
-        "У повідомленні: назва товару, магазин, що змінилося (було → стало), чому ви його отримали й посилання. "
-        "Для зниження ціни додається картка з картинкою. За запитом формується XLSX-звіт з історією змін.\n\n"
-    )
-
-
 HELP = COMMANDS_HELP
 
 
@@ -71,19 +58,7 @@ HELP = COMMANDS_HELP
 class Reply:
     text: str
     file: Path | None = None
-
-
-def _source_line(conn: sqlite3.Connection, source_id: str) -> str:
-    last = storage.last_success_run(conn, source_id)
-    health = conn.execute("SELECT * FROM source_health WHERE source_id = ?", (source_id,)).fetchone()
-    when = last["finished_at"] if last else "ще не було"
-    if health and health["stopped"]:
-        state = f"зупинено: {health['last_error']}"
-    elif health and health["alerted"]:
-        state = f"помилка: {health['last_error']}"
-    else:
-        state = "працює" if last else "даних немає"
-    return f"{source_id}: останній успішний збір {when}; стан — {state}"
+    buttons: list | None = None  # rows of menu.Button for an inline keyboard
 
 
 def _parse_options(parts: list[str]) -> tuple[Decimal | None, Decimal | None]:
@@ -120,22 +95,24 @@ def handle_command(
     if user_id not in allowed_ids:
         if command in ("/start", "/help"):
             return Reply(
-                about_text(sources)
+                menu.about_text(sources)
                 + "Керування (відстеження, звіти) доступне лише власнику бота. "
                 "Як це виглядає в роботі — у README проєкту та в демонстраційному відео."
             )
         return Reply("Доступ заборонено.")
     if not command:
-        return Reply(COMMANDS_HELP)
+        view = menu.search(conn, user_id, text, sources, allowed_ids)
+        return Reply(view.text, buttons=view.rows)
 
     def known_source(arg: str) -> SourceConfig | None:
         return sources.get(arg)
 
-    if command in ("/start", "/help"):
-        return Reply(about_text(sources) + COMMANDS_HELP)
+    if command in ("/start", "/help", "/menu"):
+        extra = "" if command == "/menu" else menu.about_text(sources) + COMMANDS_HELP
+        return Reply(extra or menu.main_view(sources).text, buttons=menu.main_buttons())
 
     if command == "/sources":
-        return Reply("\n".join(_source_line(conn, s) for s in sources))
+        return Reply("\n".join(menu.source_line(conn, s, sources[s].title) for s in sources))
 
     if command == "/products":
         if len(args) != 1 or not known_source(args[0]):
@@ -146,8 +123,8 @@ def handle_command(
         rows = conn.execute(
             "SELECT * FROM observations WHERE run_id = ? ORDER BY product_key", (last["id"],)
         ).fetchall()
-        lines = [_source_line(conn, args[0])]
-        lines += [f"{r['product_key']} — {r['name']} — {r['price']} {r['currency']} — {r['availability']}" for r in rows[:MAX_LIST_LINES]]
+        lines = [menu.source_line(conn, args[0], sources[args[0]].title)]
+        lines += [f"{r['product_key']} — {r['name']} — {r['price'] or 'ціну не вказано'} {r['currency']} — {r['availability']}" for r in rows[:MAX_LIST_LINES]]
         if len(rows) > MAX_LIST_LINES:
             lines.append(f"…і ще {len(rows) - MAX_LIST_LINES}. Повний список — у звіті /report.")
         return Reply("\n".join(lines))
@@ -205,7 +182,7 @@ def handle_command(
 
     if command == "/status":
         c = outbox.counts(conn)
-        lines = [_source_line(conn, s) for s in sources]
+        lines = [menu.source_line(conn, s, sources[s].title) for s in sources]
         lines.append(f"Черга сповіщень: очікують {c['pending']}, надіслано {c['sent']}, помилок доставки {c['failed']}.")
         failure = outbox.last_failure(conn)
         if failure:

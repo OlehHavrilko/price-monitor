@@ -13,7 +13,7 @@ def make_client(source: SourceConfig, transport: httpx.BaseTransport | None = No
         timeout=source.timeout,
         follow_redirects=False,
         transport=transport,
-        headers={"User-Agent": "price-monitor/0.1 (personal project)"},
+        headers={"User-Agent": "price-monitor-portfolio/0.1 (+https://github.com/OlehHavrilko/price-monitor)"},
     )
 
 

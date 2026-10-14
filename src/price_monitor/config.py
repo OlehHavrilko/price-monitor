@@ -29,6 +29,13 @@ def sources() -> dict[str, SourceConfig]:
             title="Books to Scrape",
             description="публічний навчальний сайт для парсингу, 1000 книжок (ціни на ньому не змінюються)",
         )
+    if os.environ.get("PRICE_MONITOR_ENABLE_ALLO") == "1":
+        # A real shop: gentle settings. 3 pages of ~2 MB each, one collection every 6 hours.
+        result["allo"] = SourceConfig(
+            id="allo", base_url="https://allo.ua", adapter="allo", max_pages=6, page_delay=3.0,
+            interval=max(interval, 6 * 3600), title="allo.ua — фітнес-браслети",
+            description="реальний інтернет-магазин електроніки, категорія «Фітнес-браслети» (близько 160 товарів)",
+        )
     return result
 
 
