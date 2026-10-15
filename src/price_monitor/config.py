@@ -36,6 +36,13 @@ def sources() -> dict[str, SourceConfig]:
             interval=max(interval, 6 * 3600), title="allo.ua — фітнес-браслети",
             description="реальний інтернет-магазин електроніки, категорія «Фітнес-браслети» (близько 160 товарів)",
         )
+    if os.environ.get("PRICE_MONITOR_ENABLE_XCOM") == "1":
+        # A real shop: gentle settings. 2 light pages, 10 s apart (its robots.txt asks for Crawl-delay 10).
+        result["xcom"] = SourceConfig(
+            id="xcom", base_url="https://xcom.ua", adapter="xcom", max_pages=5, page_delay=10.0,
+            interval=max(interval, 6 * 3600), title="xcom.ua — FM-трансмітери",
+            description="реальний інтернет-магазин, категорія «FM-трансмітери» (близько 50 товарів)",
+        )
     return result
 
 

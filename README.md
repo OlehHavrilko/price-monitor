@@ -12,7 +12,7 @@ Monitors prices and stock of products in a few fixed catalogs. It keeps the hist
 
 **What it is careful about.** It does not report changes it is not sure about. If a page fails to load, the layout changed, or the catalog looks incomplete, nothing is recorded and you are told the shop is unavailable, instead of getting "all products disappeared". A product counts as removed only after two complete checks in a row without it.
 
-**What it watches.** A real shop: the *Fitness bands* category of [allo.ua](https://allo.ua), a Ukrainian electronics store (about 160 products on 3 pages, read as plain HTML, one collection every 6 hours with a 3-second pause between pages). Real prices change on their own schedule, so alerts from it arrive when the shop really changes something.
+**What it watches.** A real shop: the *car FM transmitters* category of [xcom.ua](https://xcom.ua), a Ukrainian online store (about 50 products on 2 pages, read as plain HTML, one collection every 6 hours with the 10-second pause between pages that the shop's robots.txt asks for). Real prices and stock change on their own schedule, so alerts from it arrive when the shop really changes something. The larger shops tried first (allo.ua, brain.com.ua, rozetka, foxtrot) answer requests from a datacenter address with HTTP 403; the monitor stops on 403 and does not try to get around it, so xcom.ua is the real shop on the server. An adapter for one allo.ua category is also included and was checked from a home connection.
 
 To show every kind of reaction on demand (price drop, sold out, product removed, shop broken) there is also **Demo Shop**, a fictional shop that ships with the project. It is a test bench whose prices and stock are changed by a script, so the whole story can be played and recorded. Messages from the real shop and from the test bench look the same.
 
@@ -38,7 +38,8 @@ docker compose exec monitor price-monitor demo-play --pause 20
 
 Sources in this release:
 
-- `allo` — one category of [allo.ua](https://allo.ua) (fitness bands), a real shop. Switched on with `PRICE_MONITOR_ENABLE_ALLO=1`. Stock is inferred from the card's button ("Купити" → in stock, "Повідомити про наявність" → out of stock, "Замовити" with no price → unknown). Cards without a price are kept with no price.
+- `xcom` — one category of [xcom.ua](https://xcom.ua) (car FM transmitters), a real shop. Switched on with `PRICE_MONITOR_ENABLE_XCOM=1`. Prices and the shop's own stock wording are read from schema.org markup ("Есть на складе" → in stock, "Нет в наличии" → out of stock).
+- `allo` — one category of [allo.ua](https://allo.ua) (fitness bands), a real shop that refuses datacenter addresses (HTTP 403), so it works from a home connection only. Switched on with `PRICE_MONITOR_ENABLE_ALLO=1`. Stock is inferred from the card's button ("Купити" → in stock, "Повідомити про наявність" → out of stock, "Замовити" with no price → unknown). Cards without a price are kept with no price.
 - `demo` — a small local catalog that ships with the project, a **test bench**: its prices and stock are changed on purpose to show how the monitor reacts.
 - `books` — [books.toscrape.com](https://books.toscrape.com), a public practice site. Its prices and stock never change, so live collection there shows only parsing and pagination. Off by default.
 
@@ -135,7 +136,8 @@ Checked by automated tests (`pytest`, no network, no token): parsing against HTM
 Run by hand:
 
 - `books` live collection: 1000 products from 50 pages, a repeat gave no events.
-- `allo` live collection: 164 products from 3 pages (141 in stock, 17 out of stock, 6 priceless "order" cards).
+- `allo` live collection from a home connection: 164 products from 3 pages (141 in stock, 17 out of stock, 6 priceless "order" cards). From the VPS it gets HTTP 403, the source is stopped and the operator is told once.
+- `xcom` live collection, locally and from the VPS: 52 products from 2 pages (37 in stock, 15 out of stock).
 - `docker compose up --build` on an aarch64 Ubuntu 24.04 VPS: both containers start, the scenario from the quick start gives the documented result, the database and events survive `down` / `up`.
 - `price-monitor run` without Telegram: scheduled collection works, a second instance is refused.
 
@@ -153,7 +155,7 @@ Run by hand:
 - Stock is only IN_STOCK / OUT_OF_STOCK / UNKNOWN; exact quantities are not read.
 - The demo catalog has one currency; `books` prices are GBP. There is no conversion.
 - Single process, single machine. No distributed queue.
-- **allo.ua:** its robots.txt allows generic crawlers on category pages and the volume is low (3 pages every 6 hours, 3 s apart, an identifying User-Agent with the project URL), but the shop's terms of service have **not** been reviewed by the author. Check them before running this against allo.ua for anything beyond a personal demo. The adapter depends on the shop's page layout; a layout change makes collections fail and the bot says so, it does not guess. The page gives no product total, so completeness rests on the pager and equal page sizes.
+- **Real shops (xcom.ua, allo.ua):** their robots.txt files allow category pages for generic crawlers and the volume is low (a few pages every 6 hours, with pauses, an identifying User-Agent with the project URL), but their terms of service have **not** been reviewed by the author. Check them before running this against a real shop for anything beyond a personal demo. Adapters depend on the shops' page layouts; a layout change makes collections fail and the bot says so, it does not guess. The pages give no product total, so completeness rests on the pager and equal page sizes. Old notes about allo.ua follow: its robots.txt allows generic crawlers on category pages and the volume is low (3 pages every 6 hours, 3 s apart, an identifying User-Agent with the project URL), but the shop's terms of service have **not** been reviewed by the author. Check them before running this against allo.ua for anything beyond a personal demo. The adapter depends on the shop's page layout; a layout change makes collections fail and the bot says so, it does not guess. The page gives no product total, so completeness rests on the pager and equal page sizes.
 - The shop shows no stock count on listing cards, so "in stock" means "the Buy button is shown".
 
 ## License
