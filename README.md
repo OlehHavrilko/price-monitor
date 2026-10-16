@@ -2,7 +2,7 @@
 
 Monitors prices and stock of products in a few fixed catalogs. It keeps the history in SQLite, sends Telegram alerts for the products you track, and builds XLSX reports.
 
-**Status: release 1 in development.** The code and tests are in place; the demo video and screenshots from a real Telegram chat are not added yet (see [Verification](#verification)).
+**Status: release 1 is feature-complete and runs on a server.** What is checked and what is not: [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md). The screen recording and screenshots from a real Telegram chat are not added yet ([script](docs/video-script.md)).
 
 ## What it does
 
