@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
+from urllib.parse import urlparse
 
 from . import outbox, reports, storage
 from .models import SourceConfig
@@ -156,7 +157,9 @@ def _product_detail(
     rows = [track]
     if not rule:
         rows.append([Button("Стежити: лише наявність", f"t:{source_id}:{key}:a")])
-    rows.append([Button("Відкрити в магазині", url=row["url"])])
+    # Telegram rejects URL buttons whose host is not public ("http://demo:8080/..." in Docker).
+    if "." in (urlparse(row["url"]).hostname or "") and urlparse(row["url"]).scheme in ("http", "https"):
+        rows.append([Button("Відкрити в магазині", url=row["url"])])
     rows.append(_back(f"p:{source_id}:0", "« До списку товарів"))
     return View(text, rows)
 
