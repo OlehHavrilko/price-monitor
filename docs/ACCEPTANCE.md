@@ -1,7 +1,8 @@
 # Acceptance criteria of release 1: status and evidence
 
-Source: `TECHNICAL_SPEC.md`, section 11. "Test" means an automated test in `tests/` that runs without a
-network or a Telegram token (`pytest`). Status is stated as it is, including what is not verified.
+The criteria release 1 was built against, and what was actually checked for each. "Test" means an
+automated test in `tests/` that runs without a network or a Telegram token (`pytest`). Status is
+stated as it is, including what is not verified.
 
 | # | Criterion (short) | Status | Evidence |
 | --- | --- | --- | --- |
@@ -18,7 +19,7 @@ network or a Telegram token (`pytest`). Status is stated as it is, including wha
 | 11 | A clean run by the README builds a first report on demo data without a network or Telegram; the database and tracking survive a container restart | Done on the VPS | `docker compose up --build` on aarch64 Ubuntu 24.04, `down` / `up` kept the history and events. CI also builds the image |
 | 12 | Live smoke of a public site and a real delivery with a test bot, if a token was provided | Partly | Live collections: books.toscrape.com (1000 products), xcom.ua (52, from the VPS and locally), allo.ua (164, home connection only). Real Telegram: text alerts, bot profile and polling worked against a real bot. Picture cards and the XLSX file were accepted by the Bot API (`sent`), but the owner has not yet confirmed how they look in the chat |
 
-## Priorities from the spec
+## Priorities
 
 P0 criteria are done except the limits stated for 5 and 8. Of the P1 items: the frequency limit for
 identical source errors and the recovery message are done; `Retry-After` is **not** honoured; the
