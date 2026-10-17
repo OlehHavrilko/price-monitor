@@ -152,11 +152,11 @@ Run by hand:
 - `xcom` live collection, locally and from the VPS: 52 products from 2 pages (37 in stock, 15 out of stock).
 - `docker compose up --build` on an aarch64 Ubuntu 24.04 VPS: both containers start, the scenario from the quick start gives the documented result, the database and events survive `down` / `up`.
 - `price-monitor run` without Telegram: scheduled collection works, a second instance is refused.
+- CI on GitHub Actions: every push runs `pytest` on Python 3.12 and builds the image; the runs are green.
 
 **Not verified:**
 
-- Real Telegram delivery of the picture cards (`send_photo`) and `/report` files: text alerts and polling were checked against a real bot on the VPS; the photo path is tested only with a stand-in bot.
-- CI: the GitHub Actions workflow has not been checked yet.
+- Delivery of the XLSX file itself in the chat: the report is built and opens correctly, but sending it through Telegram has not been recorded.
 - The behavior of the `books` site if it changes its markup: a changed template is reported as a failed collection, not as an empty catalog.
 
 ## Limitations

@@ -17,7 +17,7 @@ stated as it is, including what is not verified.
 | 9 | An unauthorised Telegram ID changes no rules and gets no reports; a repeated update does not duplicate tracking | Done | `test_telegram`, `test_menu` |
 | 10 | XLSX reopens, matches the data, keeps string keys, has no executable formulas from text fields | Done | `test_reports`, `test_null_price` |
 | 11 | A clean run by the README builds a first report on demo data without a network or Telegram; the database and tracking survive a container restart | Done on the VPS | `docker compose up --build` on aarch64 Ubuntu 24.04, `down` / `up` kept the history and events. CI also builds the image |
-| 12 | Live smoke of a public site and a real delivery with a test bot, if a token was provided | Partly | Live collections: books.toscrape.com (1000 products), xcom.ua (52, from the VPS and locally), allo.ua (164, home connection only). Real Telegram: text alerts, bot profile and polling worked against a real bot. Picture cards and the XLSX file were accepted by the Bot API (`sent`), but the owner has not yet confirmed how they look in the chat |
+| 12 | Live smoke of a public site and a real delivery with a test bot, if a token was provided | Partly | Live collections: books.toscrape.com (1000 products), xcom.ua (52, from the VPS and locally), allo.ua (164, home connection only). Real Telegram: text alerts, picture cards and the button menu were delivered in a real chat (screenshots in the README). The XLSX file was accepted by the Bot API (`sent`) but its delivery in the chat is not recorded |
 
 ## Priorities
 
@@ -27,7 +27,7 @@ lost-acknowledgement test uses a stand-in sender; the report size limit (50 000 
 
 ## Not covered
 
-- Screenshots from a real Telegram chat and the screen recording (see `docs/video-script.md`).
+- Delivery of the XLSX file in the chat; the report itself was built and opened in a spreadsheet.
 - The terms of service of xcom.ua and allo.ua were not reviewed.
 - No test drives the aiogram dispatcher with real updates; button handling is tested on the menu
   layer (`test_menu`), and the wiring to Telegram was only exercised by hand.
