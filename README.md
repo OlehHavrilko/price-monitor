@@ -2,7 +2,7 @@
 
 Monitors prices and stock of products in a few fixed catalogs. It keeps the history in SQLite, sends Telegram alerts for the products you track, and builds XLSX reports.
 
-**Status: release 1 is feature-complete and runs on a server.** What is checked and what is not: [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md). The screen recording and screenshots from a real Telegram chat are not added yet ([script](docs/video-script.md)).
+**Status: release 1 is feature-complete and runs on a server.** What is checked and what is not: [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md). Screenshots from a real Telegram chat are in [Real chat](#real-chat) below.
 
 ## What it does
 
@@ -27,6 +27,18 @@ The monitor notices the new price and sends a message with a picture card. These
 | Price dropped | Sold out | Back in stock | Removed from catalog |
 | --- | --- | --- | --- |
 | ![Price drop alert](docs/screenshots/alert-price-drop.png) | ![Out of stock alert](docs/screenshots/alert-out-of-stock.png) | ![Back in stock alert](docs/screenshots/alert-back-in-stock.png) | ![Removed alert](docs/screenshots/alert-removed.png) |
+
+### Real chat
+
+Screenshots from a recording of a real Telegram chat with the bot, watching the demo shop (a fictional test bench, so the changes are scripted):
+
+| Product card with tracking buttons | Price drop and stock alerts | Stock back, product removed |
+| --- | --- | --- |
+| ![Product card in the chat](docs/screenshots/chat-product-card.png) | ![Price drop alerts](docs/screenshots/chat-price-drop-alerts.png) | ![Stock and removed alerts](docs/screenshots/chat-stock-and-removed.png) |
+
+| Source failure and recovery | XLSX report |
+| --- | --- |
+| ![Source failure message](docs/screenshots/chat-source-failure.png) | ![XLSX report in a spreadsheet](docs/screenshots/report-xlsx.png) |
 
 ### Play the whole story
 
