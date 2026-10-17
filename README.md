@@ -167,8 +167,14 @@ Run by hand:
 - Stock is only IN_STOCK / OUT_OF_STOCK / UNKNOWN; exact quantities are not read.
 - The demo catalog has one currency; `books` prices are GBP. There is no conversion.
 - Single process, single machine. No distributed queue.
-- **Real shops (xcom.ua, allo.ua):** their robots.txt files allow category pages for generic crawlers and the volume is low (a few pages every 6 hours, with pauses, an identifying User-Agent with the project URL), but their terms of service have **not** been reviewed by the author. Check them before running this against a real shop for anything beyond a personal demo. Adapters depend on the shops' page layouts; a layout change makes collections fail and the bot says so, it does not guess. The pages give no product total, so completeness rests on the pager and equal page sizes. Old notes about allo.ua follow: its robots.txt allows generic crawlers on category pages and the volume is low (3 pages every 6 hours, 3 s apart, an identifying User-Agent with the project URL), but the shop's terms of service have **not** been reviewed by the author. Check them before running this against allo.ua for anything beyond a personal demo. The adapter depends on the shop's page layout; a layout change makes collections fail and the bot says so, it does not guess. The page gives no product total, so completeness rests on the pager and equal page sizes.
+- **Real shops (xcom.ua, allo.ua):** their robots.txt files allow category pages for generic crawlers and the volume is low (2–3 pages every 6 hours, with pauses of 10 s and 3 s between pages, an identifying User-Agent with the project URL), but their terms of service have **not** been reviewed by the author. Check them before running this against a real shop for anything beyond a personal demo. Adapters depend on the shops' page layouts; a layout change makes collections fail and the bot says so, it does not guess. The pages give no product total, so completeness rests on the pager and equal page sizes.
 - The shop shows no stock count on listing cards, so "in stock" means "the Buy button is shown".
+
+## Documentation
+
+- [docs/design.md](docs/design.md) — why the project is shaped this way: scope, completeness checks, change rules, delivery guarantees, trade-offs.
+- [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) — the release criteria and what was actually checked for each.
+- [docs/video-script.md](docs/video-script.md) — the script of the demo video.
 
 ## License
 
