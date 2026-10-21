@@ -137,6 +137,31 @@ def test_temporary_failure_backs_off_then_gives_up(conn):
     assert outbox.counts(conn)["failed"] == 1 and "gave up" in outbox.last_failure(conn)
 
 
+def test_rate_limit_waits_as_told_and_does_not_use_up_attempts(conn):
+    queued(conn, 3)
+    calls = []
+
+    def limited(chat, text, card=None):
+        calls.append(text)
+        raise outbox.RateLimitedError("Too Many Requests", retry_after=40)
+
+    now = datetime.now(timezone.utc)
+    report = outbox.deliver_pending(conn, limited, now)
+    assert report.retry_later == 1 and calls == ["text 0"]  # the batch stops at the first 429
+    row = conn.execute("SELECT * FROM notification_outbox ORDER BY id").fetchone()
+    assert row["attempts"] == 0 and "retry after 40 s" in row["last_error"]
+    assert row["next_attempt_at"] == (now + timedelta(seconds=40)).isoformat(timespec="seconds")
+
+    for _ in range(outbox.MAX_ATTEMPTS + 2):  # rate limits never make it give up
+        now += timedelta(seconds=41)
+        outbox.deliver_pending(conn, limited, now)
+    assert outbox.counts(conn)["failed"] == 0
+
+    sent = []
+    now += timedelta(seconds=41)
+    assert outbox.deliver_pending(conn, lambda c, t, card=None: sent.append(t), now).sent == 3
+
+
 def test_permanent_failure_is_not_retried(conn):
     queued(conn)
     calls = []

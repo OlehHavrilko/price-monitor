@@ -163,7 +163,8 @@ Alerts are sent only for tracked products, one message per product and collectio
 
 - **One instance.** `price-monitor run` takes a file lock (`service.lock` next to the database); a second service exits. A per-source file lock also stops a manual `collect` from running alongside a scheduled one.
 - **After downtime** exactly one fresh collection runs, then the normal interval; missed intervals are not replayed.
-- **Delivery is at-least-once.** If Telegram does not answer in time, the message may still have arrived and is sent again, so a rare duplicate is possible. A message is retried up to 6 times with growing delays; a blocked bot or unknown chat is not retried. Failed messages stay in the database and show in `/status`.
+- **Delivery is at-least-once.** If Telegram does not answer in time, the message may still have arrived and is sent again, so a rare duplicate is possible. A message is retried up to 6 times with growing delays; a blocked bot or unknown chat is not retried. When Telegram answers 429 with `retry_after`, the message waits exactly that long, the rest of the batch waits for the next round, and the refusal does not count towards the 6 attempts (a 429 means the message was not delivered). Failed messages stay in the database and show in `/status`.
+- **HTTP 429 and 503** from a shop are retried within the same collection. A `Retry-After` header (seconds or an HTTP date) replaces the backoff delay; if the shop asks for more than 120 seconds, the collection fails without waiting and the next scheduled one tries again.
 - **HTTP 401/403** stops the source. After checking the access terms, resume it with `price-monitor resume-source <source>`.
 - **Backup:**
   ```bash
@@ -197,7 +198,7 @@ Run by hand:
 ## Limitations
 
 - Completeness cannot be proven beyond structural checks (declared count, pagination, duplicates); a source that silently drops a card and updates its declared count would not be noticed.
-- `Retry-After` is not honored; retries use fixed exponential delays. Redirects are treated as failures.
+- Redirects are treated as failures. A shop's `Retry-After` longer than 120 seconds is not waited for inside a collection.
 - A stock change that passes through `UNKNOWN` between two collections is not reported.
 - Stock is only IN_STOCK / OUT_OF_STOCK / UNKNOWN; exact quantities are not read.
 - The demo catalog has one currency; `books` prices are GBP. There is no conversion.

@@ -25,6 +25,17 @@ class TemporaryDeliveryError(Exception):
     """Network error, timeout or server error. The message may or may not have arrived."""
 
 
+class RateLimitedError(TemporaryDeliveryError):
+    """Telegram refused the message with 429 and said when to try again (retry_after, seconds).
+
+    The message was not delivered, so this attempt does not count towards MAX_ATTEMPTS.
+    """
+
+    def __init__(self, message: str, retry_after: float):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
 # send(chat_id, text, card): card is the data for an alert picture, or None for a plain text message.
 Sender = Callable[[int, str, "dict | None"], None]
 
@@ -72,6 +83,15 @@ def deliver_pending(
         except PermanentDeliveryError as exc:
             _mark_failed(conn, row["id"], row["attempts"] + 1, str(exc))
             failed += 1
+        except RateLimitedError as exc:
+            # Wait as long as Telegram asks, and stop this batch: the next messages would only be refused too.
+            delay = max(exc.retry_after, 1)
+            conn.execute(
+                "UPDATE notification_outbox SET last_error = ?, next_attempt_at = ? WHERE id = ?",
+                (f"rate limited, retry after {delay:g} s: {exc}", _iso(now + timedelta(seconds=delay)), row["id"]),
+            )
+            retry += 1
+            break
         except TemporaryDeliveryError as exc:
             attempts = row["attempts"] + 1
             if attempts >= MAX_ATTEMPTS:

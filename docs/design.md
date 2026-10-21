@@ -118,7 +118,11 @@ threshold is not two alerts.
 Events and outbox rows are written in the same transaction as the snapshot, and delivery happens
 afterwards. A restart continues from the queue. A message is retried up to six times with growing
 delays; a blocked bot or an unknown chat is not retried at all, and the failure stays visible in
-`/status`.
+`/status`. A 429 from Telegram is different: it says the message was refused and when to come back,
+so the message waits exactly `retry_after`, the batch stops, and the refusal does not count as an
+attempt. Shops get the same courtesy within a collection: `Retry-After` on 429 or 503 replaces the
+backoff, up to 120 seconds; a longer request fails the run, because holding the source lock for an
+hour would be worse than trying again at the next scheduled collection.
 
 If Telegram times out, the message may have arrived and still be sent again. That is documented
 instead of being promised away: exactly-once delivery over a network the program does not control is
@@ -204,6 +208,7 @@ are served from the package, so the page works without a CDN. The XLSX is built 
 ## Known limits
 
 Stated as they are in the README, and not repeated here: completeness beyond structural checks,
-`Retry-After` not honoured, redirects treated as failures, a stock change that passes through
+a shop's `Retry-After` above 120 seconds failing the run instead of being waited for, redirects
+treated as failures, a stock change that passes through
 `UNKNOWN` between two collections going unreported, no exact quantities, single process, and the
 shop terms of service of the two real shops not having been reviewed.

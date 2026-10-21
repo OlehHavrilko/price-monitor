@@ -194,13 +194,17 @@ def handle_command(
 
 def classify_send_error(exc: BaseException) -> Exception:
     """Map an aiogram or network error to the outbox's permanent/temporary distinction."""
-    from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramUnauthorizedError
+    from aiogram.exceptions import (
+        TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter, TelegramUnauthorizedError,
+    )
 
+    if isinstance(exc, TelegramRetryAfter):
+        return outbox.RateLimitedError(str(exc), exc.retry_after)
     if isinstance(exc, (TelegramForbiddenError, TelegramUnauthorizedError)):
         return outbox.PermanentDeliveryError(str(exc))
     if isinstance(exc, TelegramBadRequest) and "chat not found" in str(exc).lower():
         return outbox.PermanentDeliveryError(str(exc))
-    # Timeouts, network failures, rate limits and 5xx: the message may still have been delivered.
+    # Timeouts, network failures and 5xx: the message may still have been delivered.
     return outbox.TemporaryDeliveryError(f"{type(exc).__name__}: {exc}")
 
 
