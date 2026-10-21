@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -e ".[dev]"
+      - run: pip install -e ".[dev,web]"
       - run: pytest -q
 
   container:
@@ -21,3 +21,8 @@ jobs:
       - uses: actions/checkout@v4
       - run: docker build -t price-monitor .
       - run: docker run --rm price-monitor price-monitor --help
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install openpyxl
+      - run: python scripts/smoke_web_compose.py
