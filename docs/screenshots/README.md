@@ -2,14 +2,16 @@
 
 Images in this folder are taken from real runs; none are mock-ups.
 
-Reserved for the web dashboard, not taken yet (to be captured from `docker compose --profile web up`
-on the demo catalog after the `price_drop` and `out_of_stock` scenarios):
+The `web-*.png` files were captured in Chromium (1280 px, light theme) from
+`docker compose --profile web up` on clean volumes. The demo catalog went through the `price_drop`,
+`out_of_stock`, `product_missing` and `initial` scenarios, with tracking set on `00123`, `01001` and
+`01002`. Collections ran every 15 seconds.
 
 | File | Page |
 | --- | --- |
 | `web-sources.png` | Джерела — source cards |
-| `web-products.png` | Товари — search and filters |
-| `web-product-history.png` | Товар `00123` — price chart 24.90 → 19.90 and events |
-| `web-events.png` | Події — filtered by "Закінчився" / "Знову в наявності" |
+| `web-products.png` | Товари — products of the last snapshot |
+| `web-product-history.png` | Товар `00123` — price chart 24.90 → 19.90 → 24.90 and events |
+| `web-events.png` | Події — price changes, sold out / back in stock, removed / returned |
 | `web-report.png` | Звіт — period form |
-| `web-status.png` | Стан — queue and recent collections |
+| `web-status.png` | Стан — queue, database and recent collections |

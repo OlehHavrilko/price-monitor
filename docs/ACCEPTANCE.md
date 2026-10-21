@@ -32,7 +32,7 @@ stated as it is, including what is not verified.
 | XLSX from the page matches the database; temporary file removed | Done | `test_xlsx_download_matches_the_database_and_cleans_up` |
 | Compose: `--profile web` on clean volumes, port on 127.0.0.1 only, data survives `down` / `up` | Done locally | Clean volumes in a local Docker: demo, monitor and web start, the scenarios give the expected events on the pages, `down` / `up` kept them, a missing token stops only the dashboard, `docker compose up` without the profile starts demo and monitor as before. Not repeated on the VPS |
 | A `:ro` data volume | Not used, by design | With `:ro` SQLite cannot open the WAL database while the monitor has no connection open (checked in Docker); read-only is enforced by `mode=ro` + `query_only` instead |
-| Screenshots of the dashboard | Not done | Names reserved in `docs/screenshots/README.md` |
+| Screenshots of the dashboard | Done | Six pages in `docs/screenshots/web-*.png`, captured from the Compose stack on the demo catalog; how they were taken is in `docs/screenshots/README.md` |
 
 ## Priorities
 
