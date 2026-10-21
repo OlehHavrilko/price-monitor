@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="htmx-config" content='{"allowEval":false,"includeIndicatorStyles":false,"selfRequestsOnly":true,"historyCacheSize":0}'>
+<title>{{ title }} · Price Monitor</title>
+<link rel="stylesheet" href="/static/dashboard.css">
+<script src="/static/vendor/htmx-2.0.4.min.js" defer></script>
+{% block scripts %}{% endblock %}
+</head><body>
+<a class="skip" href="#main">До вмісту</a>
+<header><a class="brand" href="/">◈ Price Monitor <span>Панель спостереження</span></a>
+<nav aria-label="Головна навігація"><a href="/">Магазини</a><a href="/events">Події</a><a href="/report">XLSX-звіт</a><a href="/status">Стан</a></nav>
+{% if request.url.path != '/login' %}<form action="/logout" method="post"><button class="subtle">Вийти</button></form>{% endif %}</header>
+<main id="main"><div class="eyebrow">PRICE MONITOR / ЛИШЕ ПЕРЕГЛЯД</div>{% block content %}{% endblock %}</main>
+<footer>Дані з останніх перевірок • Час у UTC • Керування відстеженням доступне в Telegram</footer>
+</body></html>

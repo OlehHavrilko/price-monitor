@@ -1,0 +1,3 @@
+{% extends 'base.html' %}{% block content %}<section class="panel login"><h1>Вхід до панелі</h1><p class="muted">Введіть токен доступу, заданий власником сервісу.</p>
+{% if error %}<p role="alert" class="notice error">{{ error }}</p>{% endif %}
+<form method="post" action="/login"><label>Токен доступу<input type="password" name="token" required autocomplete="current-password" maxlength="2048"></label><button>Увійти</button></form></section>{% endblock %}

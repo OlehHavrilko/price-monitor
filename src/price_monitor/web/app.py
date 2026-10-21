@@ -2,6 +2,11 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException
+
+from .routes import register_routes
+from .views import render
 
 from .. import config
 from .auth import authenticated, required_token
@@ -34,7 +39,17 @@ def create_app(*, db_path: Path | None = None, token: str | None = None, sources
 
     @app.exception_handler(DatabaseUnavailable)
     async def database_error(request, exc):
-        return HTMLResponse('<html lang="uk"><p>База даних поки недоступна. '
-                            'Перевірте запуск monitor та сумісність бази.</p></html>', status_code=503)
+        return render(request, "error.html", status_code=503, title="База недоступна", message=str(exc))
 
+    @app.exception_handler(HTTPException)
+    async def http_error(request, exc):
+        message = exc.detail if exc.status_code != 404 else "Сторінку, джерело або товар не знайдено."
+        return render(request, "error.html", status_code=exc.status_code, title=f"Помилка {exc.status_code}", message=message)
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(request, exc):
+        return render(request, "error.html", status_code=422, title="Некоректний запит",
+                      message="Перевірте параметри: номер сторінки має бути додатним, пошук — до 200 символів.")
+
+    register_routes(app, secret)
     return app
