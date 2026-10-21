@@ -23,7 +23,9 @@ report, a scheduler, a local demo shop to play every scenario, Docker Compose, C
 
 Out, deliberately: importing a supplier's price list, comparing several shops with each other,
 monitoring classified ads, a parser for an arbitrary URL, browser automation, CAPTCHA or anti-bot
-bypass, proxies, a web UI, several currencies per product, payments, LLM features.
+bypass, proxies, a web UI, several currencies per product, payments, LLM features. A read-only web
+dashboard was added after release 1 (see [Web dashboard](#web-dashboard)); editing from the web
+is still out.
 
 The excluded list is not modesty. Each item changes the shape of the product: an arbitrary-URL parser
 kills the guarantee that a snapshot is complete, and cross-shop comparison needs a matching table
@@ -67,8 +69,9 @@ and the operator has to look at the terms before resuming.
 ## Data model
 
 SQLite, schema version in `PRAGMA user_version`, a database from a newer version is refused. Tables:
-`sources`, `collection_runs`, `products`, `observations`, `tracking_rules`, `events`,
-`notification_outbox`.
+`sources`, `collection_runs`, `products`, `observations`, `product_state` (consecutive absences
+and the removed flag), `tracking_rules`, `events`, `notification_outbox`, `source_health` (an outage
+already reported, a source stopped after 401/403).
 
 Prices are `Decimal` in code and a canonical decimal string in the database; percentages are computed
 exactly. Nothing about money goes through float.
@@ -152,6 +155,34 @@ not become a formula. The file name is generated and the path is not accepted fr
 report above 50 000 rows is refused with a request for a shorter period instead of silently producing
 something enormous.
 
+## Web dashboard
+
+`price-monitor web` serves six pages over the same database: sources, products of the last
+successful snapshot (search, stock and tracking filters), the price history of one product with a
+chart, events, an XLSX report and the service status. It is a window, not a second control panel:
+tracking rules are still changed in Telegram and collections still run in the monitor, so there is
+one place where state changes.
+
+Read-only is enforced by SQLite, not by convention. The dashboard never calls `storage.connect()`,
+which switches the journal mode and migrates; it opens the file with `mode=ro` and `PRAGMA
+query_only`, refuses a missing database instead of creating one, and refuses a schema version other
+than its own. The data volume is still mounted writable in Compose: a reader of a WAL database has to
+create the shared-memory index file, and with a `:ro` mount the database cannot be opened whenever
+the monitor has no connection open, which is most of the time between collections.
+
+Stock events are stored as `AVAILABILITY_CHANGED` with the old and new value. "Sold out" and "back in
+stock" are filters over that, not new event types, so the stored history and the report do not
+change. Prices reach the page as the stored decimal strings; the chart turns them into numbers only
+to place the points.
+
+Access is one shared token (`PRICE_MONITOR_WEB_TOKEN`, at least 16 characters, no default). A browser
+signs in with a form and gets an HttpOnly, SameSite=Strict cookie that holds an HMAC of the token, not
+the token; scripts send `Authorization: Bearer`. The token is never in a URL. Compose publishes the
+port on 127.0.0.1 only, and the dashboard is behind a profile, so `docker compose up` without a token
+starts exactly what it started before. Pages send a strict Content-Security-Policy; htmx and Chart.js
+are served from the package, so the page works without a CDN. The XLSX is built by the same
+`reports.write_report()` as the CLI and the bot, in a temporary directory removed after the download.
+
 ## Technical choices worth naming
 
 - **SQLite** — the whole dataset is one operator's catalog history, a few thousand rows per week. A
@@ -165,6 +196,8 @@ something enormous.
   on.
 - **Pillow for alert cards** — the alert picture is generated from the same numbers as the caption, so
   the two cannot disagree. It is a small PNG, not a dashboard.
+- **FastAPI + Jinja2 + htmx** for the dashboard — server-rendered pages that also work without
+  JavaScript; htmx only swaps the result table when a filter changes. No build step, no SPA.
 - **APScheduler inside the process** — a separate worker plus a queue would be the right shape for
   many sources and several machines. Here it would only add moving parts.
 
