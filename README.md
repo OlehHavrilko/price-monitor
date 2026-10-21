@@ -107,6 +107,14 @@ A read-only dashboard over the same database, in Ukrainian, for desktop and phon
 | Звіт (`/report`) | the same XLSX report as the CLI and the bot, for a chosen source and period (both dates included, UTC) |
 | Стан (`/status`) | notification queue, last delivery error, source health, the last 20 collections |
 
+| Sources | Product history | Events |
+| --- | --- | --- |
+| ![Sources page](docs/screenshots/web-sources.png) | ![Price history of 00123](docs/screenshots/web-product-history.png) | ![Events page](docs/screenshots/web-events.png) |
+
+| Products | Report | Status |
+| --- | --- | --- |
+| ![Products page](docs/screenshots/web-products.png) | ![Report page](docs/screenshots/web-report.png) | ![Status page](docs/screenshots/web-status.png) |
+
 It changes nothing: tracking rules are set in Telegram, collections run in the monitor. The database is opened with SQLite `mode=ro` and `query_only`.
 
 With Docker Compose, put a token of at least 16 characters into `.env` and start the `web` profile:
