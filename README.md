@@ -179,7 +179,7 @@ Alerts are sent only for tracked products, one message per product and collectio
 
 ## Verification
 
-Checked by automated tests (`pytest`, no network, no token): parsing against HTML fixtures, pagination and network failures against a real local HTTP server, comparison rules and boundaries, REMOVED/RETURNED, transactional events + queue, restart of the queue, outage alerts, the file lock across processes, Telegram command logic and the allowlist, XLSX contents, the web dashboard (sign-in, every page, string keys, filters, escaping, the XLSX download, and that the database file is not changed).
+Checked by automated tests (`pytest`, no network, no token): parsing against HTML fixtures, pagination and network failures against a real local HTTP server, comparison rules and boundaries, REMOVED/RETURNED, transactional events + queue, restart of the queue, outage alerts, the file lock across processes, the scheduler (no overlapping runs, no replay of missed runs, one immediate run after a start, a second instance refused), Telegram command logic and the allowlist, XLSX contents, the web dashboard (sign-in, every page, string keys, filters, escaping, the XLSX download, and that the database file is not changed).
 
 Run by hand:
 
