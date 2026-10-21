@@ -1,4 +1,4 @@
-# Two containers: the demo catalog (a test bench) and the monitor. The database lives in the
+# Demo catalog, monitor and a read-only web dashboard. The database lives in the
 # named volume "data" and survives `docker compose down` and container restarts.
 services:
   demo:
@@ -28,6 +28,23 @@ services:
     volumes:
       - data:/data
       - demo-state:/demo-state # lets `demo-play` switch the demo catalog scenarios
+    restart: unless-stopped
+
+  web:
+    build: .
+    command: ["price-monitor", "web", "--host", "0.0.0.0", "--port", "8000"]
+    depends_on:
+      monitor:
+        condition: service_started
+    environment:
+      PRICE_MONITOR_WEB_TOKEN: ${PRICE_MONITOR_WEB_TOKEN:?Set PRICE_MONITOR_WEB_TOKEN in .env}
+      PRICE_MONITOR_ENABLE_BOOKS: ${PRICE_MONITOR_ENABLE_BOOKS:-0}
+      PRICE_MONITOR_ENABLE_ALLO: ${PRICE_MONITOR_ENABLE_ALLO:-0}
+      PRICE_MONITOR_ENABLE_XCOM: ${PRICE_MONITOR_ENABLE_XCOM:-0}
+    volumes:
+      - data:/data:ro
+    ports:
+      - "127.0.0.1:${PRICE_MONITOR_WEB_PORT:-8000}:8000"
     restart: unless-stopped
 
 volumes:

@@ -86,3 +86,31 @@ def test_filter_and_partial(web_data):
     assert "Desk lamp Nord" in response.text and "spare bulb" not in response.text
     assert "Office chair Basic" in client.get("/sources/demo?availability=OUT_OF_STOCK").text
     assert "Desk lamp Nord" not in client.get("/sources/demo?availability=OUT_OF_STOCK").text
+
+
+def test_report_download_reuses_generator_and_cleans_files(web_data, monkeypatch):
+    from io import BytesIO
+    from openpyxl import load_workbook
+    from price_monitor import reports
+    client = web_data[0]
+    generated = []
+    original = reports.write_report
+    def record(*args, **kwargs):
+        path = original(*args, **kwargs)
+        generated.append(path)
+        return path
+    monkeypatch.setattr(reports, "write_report", record)
+    response = client.get("/report/download", params={"source": "demo", "since": "2000-01-01", "until": "2100-01-01"})
+    assert response.status_code == 200
+    assert generated and not generated[0].parent.exists()
+    book = load_workbook(BytesIO(response.content))
+    assert book.sheetnames == ["Current", "History"]
+    current = {r[1]: r for r in book["Current"].iter_rows(min_row=2, values_only=True)}
+    assert current["00123"][4] == 19.9 and current["123"][4] == 3.5
+    assert len(list(book["History"].iter_rows(min_row=2))) == 4
+    book.close()
+
+
+@pytest.mark.parametrize("since,until", [("bad", "2026-01-01"), ("2026-02-01", "2026-01-01")])
+def test_report_invalid_period(web_data, since, until):
+    assert web_data[0].get("/report/download", params={"source":"demo", "since":since, "until":until}).status_code == 400

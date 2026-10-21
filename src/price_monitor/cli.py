@@ -54,6 +54,23 @@ def cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_web(args: argparse.Namespace) -> int:
+    # Optional imports: existing commands work without the [web] extra.
+    try:
+        import uvicorn
+        from .web.app import create_app
+    except ImportError:
+        print('Web dependencies are missing. Install price-monitor[web].', file=sys.stderr)
+        return 2
+    try:
+        app = create_app()
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    uvicorn.run(app, host=args.host, port=args.port, proxy_headers=False)
+    return 0
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     from .scheduler import run_service
 
@@ -121,6 +138,11 @@ def cmd_demo_scenario(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="price-monitor")
     sub = parser.add_subparsers(dest="command", required=True)
+
+    p = sub.add_parser("web", help="serve the read-only web dashboard (requires [web] and PRICE_MONITOR_WEB_TOKEN)")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8000)
+    p.set_defaults(func=cmd_web)
 
     p = sub.add_parser("collect", help="run one collection for a source")
     p.add_argument("source", nargs="?", default="demo")

@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from . import queries
 from .auth import COOKIE, matches
 from .db import read_database
+from .downloads import download_report
 from .views import ROOT, pagination, render
 
 
@@ -119,6 +120,10 @@ def register_routes(app, token):
         today = datetime.now(timezone.utc).date()
         return render(request, "report.html", title="XLSX-звіт", sources=sources,
                       since=(today - timedelta(days=7)).isoformat(), until=(today + timedelta(days=1)).isoformat())
+
+    @app.get("/report/download")
+    def report_download(source: str, since: str, until: str):
+        return download_report(app, source, since, until)
 
     @app.get("/status")
     def status(request: Request):
