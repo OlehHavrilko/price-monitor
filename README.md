@@ -55,7 +55,7 @@ Sources in this release:
 - `demo` — a small local catalog that ships with the project, a **test bench**: its prices and stock are changed on purpose to show how the monitor reacts.
 - `books` — [books.toscrape.com](https://books.toscrape.com), a public practice site. Its prices and stock never change, so live collection there shows only parsing and pagination. Off by default.
 
-Out of scope: supplier price-list import, ad monitoring, browser automation, CAPTCHA/anti-bot bypass, proxies, a web UI, several currencies.
+Out of scope: supplier price-list import, ad monitoring, browser automation, CAPTCHA/anti-bot bypass, proxies, editing from the web, several currencies.
 
 ## Quick start (Docker Compose)
 
@@ -83,15 +83,42 @@ Python 3.11+.
 
 ```bash
 python -m venv .venv
-.venv/Scripts/pip install -e ".[dev]"      # Linux/macOS: .venv/bin/pip
+.venv/Scripts/pip install -e ".[dev,web]"  # Linux/macOS: .venv/bin/pip
 price-monitor demo-serve &                  # catalog on 127.0.0.1:8080
 price-monitor collect                       # one collection, no Telegram needed
 price-monitor report --since 2026-01-01 --until 2027-01-01
 price-monitor run                           # service: schedule + Telegram (if configured)
+PRICE_MONITOR_WEB_TOKEN=... price-monitor web  # read-only dashboard on 127.0.0.1:8000
 pytest
 ```
 
 Files go to `./data` by default (`PRICE_MONITOR_DB`, `PRICE_MONITOR_REPORTS`, `PRICE_MONITOR_DEMO_STATE` change that).
+
+## Web dashboard
+
+A read-only dashboard over the same database, in Ukrainian, for desktop and phone, light or dark following the system setting:
+
+| Page | What it shows |
+| --- | --- |
+| Джерела (`/`) | each source: last successful collection, products in the snapshot, stock counts, tracked products, events in 24 h, last attempt and error, stopped state |
+| Товари (`/products`) | products of the last successful snapshot; search by name or key, stock filter, "tracked only", pages of 25 |
+| Товар (`/product?source=…&key=…`) | current price and stock, tracking rule, price history chart and table (points where price or stock changed), events of the product |
+| Події (`/events`) | events with filters by source, type (price change, below threshold, percent drop, sold out, back in stock, removed, returned), product and dates |
+| Звіт (`/report`) | the same XLSX report as the CLI and the bot, for a chosen source and period (both dates included, UTC) |
+| Стан (`/status`) | notification queue, last delivery error, source health, the last 20 collections |
+
+It changes nothing: tracking rules are set in Telegram, collections run in the monitor. The database is opened with SQLite `mode=ro` and `query_only`.
+
+With Docker Compose, put a token of at least 16 characters into `.env` and start the `web` profile:
+
+```bash
+echo "PRICE_MONITOR_WEB_TOKEN=$(python -c 'import secrets; print(secrets.token_urlsafe(32))')" >> .env
+docker compose --profile web up -d --build
+```
+
+Open http://127.0.0.1:8000 and enter the token. The port is published on 127.0.0.1 only; to reach it from another machine, use an SSH tunnel (`ssh -L 8000:127.0.0.1:8000 server`) or a reverse proxy with TLS, and then set `PRICE_MONITOR_WEB_SECURE_COOKIE=1`. Plain `docker compose up` does not start the dashboard.
+
+Without Docker: `pip install -e ".[web]"`, then `PRICE_MONITOR_WEB_TOKEN=... price-monitor web` (127.0.0.1:8000 by default). Scripts can call the pages with `Authorization: Bearer <token>`, for example `curl -H "Authorization: Bearer $TOKEN" -o report.xlsx "http://127.0.0.1:8000/report.xlsx?source=demo&since=2026-10-01&until=2026-10-31"`.
 
 ## Telegram
 
@@ -143,7 +170,7 @@ Alerts are sent only for tracked products, one message per product and collectio
 
 ## Verification
 
-Checked by automated tests (`pytest`, no network, no token): parsing against HTML fixtures, pagination and network failures against a real local HTTP server, comparison rules and boundaries, REMOVED/RETURNED, transactional events + queue, restart of the queue, outage alerts, the file lock across processes, Telegram command logic and the allowlist, XLSX contents.
+Checked by automated tests (`pytest`, no network, no token): parsing against HTML fixtures, pagination and network failures against a real local HTTP server, comparison rules and boundaries, REMOVED/RETURNED, transactional events + queue, restart of the queue, outage alerts, the file lock across processes, Telegram command logic and the allowlist, XLSX contents, the web dashboard (sign-in, every page, string keys, filters, escaping, the XLSX download, and that the database file is not changed).
 
 Run by hand:
 

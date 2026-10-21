@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% set p = d.product %}
+{% block title %}{{ p.name }}{% endblock %}
+{% block head %}<script src="/static/chart.umd.min.js" defer></script>{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="{{ link('/products', source=source) }}">← {{ title_of(source) }}</a></p>
+<h1>{{ p.name }}</h1>
+<p class="muted">Код <code>{{ p.product_key }}</code> · джерело <code>{{ source }}</code> · вперше побачено {{ p.first_seen | utc }}</p>
+
+<section class="panel summary">
+  <dl class="facts">
+    <dt>Ціна зараз</dt>
+    <dd class="big">{% if d.latest and d.latest.price is not none %}{{ d.latest.price }} {{ d.latest.currency }}{% else %}—{% endif %}</dd>
+    <dt>Наявність</dt>
+    <dd>{% if d.removed %}<span class="stock REMOVED">{{ availability_labels['REMOVED'] }}</span>
+      {% elif d.latest %}<span class="stock {{ d.latest.availability }}">{{ availability_labels[d.latest.availability] }}</span>{% else %}—{% endif %}
+      {% if not d.in_snapshot and not d.removed %}<span class="muted">(немає в останньому знімку)</span>{% endif %}</dd>
+    <dt>Останнє спостереження</dt>
+    <dd>{% if d.latest %}{{ d.latest.observed_at | utc }}{% else %}—{% endif %}</dd>
+    <dt>Відстеження</dt>
+    <dd>{% if d.rule %}так{% if d.rule.threshold %}, нижче {{ d.rule.threshold }}{% endif %}{% if d.rule.drop_percent %}, падіння на {{ d.rule.drop_percent }}%{% endif %}{% if not d.rule.threshold and not d.rule.drop_percent %}, лише наявність і видалення{% endif %}{% else %}ні <span class="muted">(змінюється в Telegram)</span>{% endif %}</dd>
+  </dl>
+  {% set href = p.url | shop_href %}
+  {% if href %}<p><a href="{{ href }}" target="_blank" rel="noopener noreferrer nofollow">Сторінка товару в магазині ↗</a></p>{% endif %}
+</section>
+
+<section class="panel">
+  <h2>Історія ціни</h2>
+  {% if d.points %}
+  <div class="chart-box"><canvas id="price-chart" aria-label="Графік ціни {{ p.name }}" role="img"></canvas></div>
+  <script type="application/json" id="chart-data">{{ chart | tojson }}</script>
+  <p class="muted">Спостережень: {{ d.observations }}. Показано точки, де змінилася ціна або наявність{% if d.truncated %} (лише останні {{ d.points | length }}){% endif %}. Розрив лінії — у товару не було ціни.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Час (UTC)</th><th class="num">Ціна</th><th>Наявність</th></tr></thead>
+      <tbody>
+      {% for pt in d.points | reverse %}
+        <tr>
+          <td>{{ pt.observed_at | utc }}{% if pt.latest %} <span class="muted">(останнє, без змін)</span>{% endif %}</td>
+          <td class="num">{% if pt.price is not none %}{{ pt.price }} {{ pt.currency }}{% else %}<span class="muted">немає ціни</span>{% endif %}</td>
+          <td><span class="stock {{ pt.availability }}">{{ availability_labels[pt.availability] }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">Спостережень ще немає.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Події товару</h2>
+  {% if d.events %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Час (UTC)</th><th>Подія</th><th>Було</th><th>Стало</th></tr></thead>
+      <tbody>
+      {% for e in d.events %}
+        <tr><td>{{ e.created_at | utc }}</td><td><span class="kind {{ e.kind }}">{{ event_labels.get(e.kind, e.kind) }}</span></td>
+          <td>{{ e.old_value | event_value }}</td><td>{{ e.new_value | event_value }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">Подій для цього товару ще не було.</p>
+  {% endif %}
+</section>
+{% endblock %}

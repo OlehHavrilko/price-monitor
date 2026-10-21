@@ -1,5 +1,5 @@
-# Two containers: the demo catalog (a test bench) and the monitor. The database lives in the
-# named volume "data" and survives `docker compose down` and container restarts.
+# Two containers: the demo catalog (a test bench) and the monitor, plus the optional dashboard.
+# The database lives in the named volume "data" and survives `docker compose down` and container restarts.
 services:
   demo:
     build: .
@@ -28,6 +28,29 @@ services:
     volumes:
       - data:/data
       - demo-state:/demo-state # lets `demo-play` switch the demo catalog scenarios
+    restart: unless-stopped
+
+  # Read-only web dashboard. Off by default: start it with `docker compose --profile web up -d`
+  # after setting PRICE_MONITOR_WEB_TOKEN in .env. It is published on 127.0.0.1 only.
+  web:
+    build: .
+    profiles: ["web"]
+    command: ["price-monitor", "web", "--host", "0.0.0.0", "--port", "8000"]
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      # Not mounted :ro on purpose: a SQLite reader of a WAL database must be able to create the
+      # shared-memory index (price_monitor.db-shm). The dashboard opens the file with mode=ro and
+      # query_only, so it cannot change any data.
+      - data:/data
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     restart: unless-stopped
 
 volumes:

@@ -19,6 +19,21 @@ stated as it is, including what is not verified.
 | 11 | A clean run by the README builds a first report on demo data without a network or Telegram; the database and tracking survive a container restart | Done on the VPS | `docker compose up --build` on aarch64 Ubuntu 24.04, `down` / `up` kept the history and events. CI also builds the image |
 | 12 | Live smoke of a public site and a real delivery with a test bot, if a token was provided | Partly | Live collections: books.toscrape.com (1000 products), xcom.ua (52, from the VPS and locally), allo.ua (164, home connection only). Real Telegram: text alerts, picture cards and the button menu were delivered in a real chat (screenshots in the README). The XLSX file was accepted by the Bot API (`sent`) but its delivery in the chat is not recorded |
 
+## Web dashboard (after release 1)
+
+| Criterion | Status | Evidence |
+| --- | --- | --- |
+| Six read-only pages: sources, products, product history, events, report, status | Done | `test_web::test_every_page_answers_and_sends_security_headers`; checked in Chromium at 1280 px and 390 px, light and dark, no console errors under the CSP |
+| No page changes the database; a missing database is not created | Done | `test_the_dashboard_never_writes` (the database file is byte-identical after every page and a report; a write on the connection fails), `test_missing_or_foreign_database_is_explained_not_created` |
+| Access only with the token; no token in URLs; local redirects only | Done | `test_pages_need_the_token`, `test_sign_in_sets_an_http_only_cookie_and_only_local_redirects`, `test_the_dashboard_refuses_to_start_without_a_strong_token` |
+| `00123` and `123` stay different; history 24.90 → 19.90 is exact | Done | `test_keys_are_strings_and_the_price_history_is_exact` |
+| Search, filters, sold out / back in stock as a view on AVAILABILITY_CHANGED | Done | `test_search_and_filters`, `test_stock_directions_are_a_view_on_stored_events`; htmx live search checked in Chromium |
+| Text from shop pages is escaped; `javascript:` links are not rendered | Done | `test_text_from_shop_pages_is_escaped_and_unsafe_links_are_dropped` |
+| XLSX from the page matches the database; temporary file removed | Done | `test_xlsx_download_matches_the_database_and_cleans_up` |
+| Compose: `--profile web` on clean volumes, port on 127.0.0.1 only, data survives `down` / `up` | Done locally | Clean volumes in a local Docker: demo, monitor and web start, the scenarios give the expected events on the pages, `down` / `up` kept them, a missing token stops only the dashboard, `docker compose up` without the profile starts demo and monitor as before. Not repeated on the VPS |
+| A `:ro` data volume | Not used, by design | With `:ro` SQLite cannot open the WAL database while the monitor has no connection open (checked in Docker); read-only is enforced by `mode=ro` + `query_only` instead |
+| Screenshots of the dashboard | Not done | Names reserved in `docs/screenshots/README.md` |
+
 ## Priorities
 
 P0 criteria are done except the limits stated for 5 and 8. Of the P1 items: the frequency limit for

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Товари{% endblock %}
+{% block content %}
+<h1>Товари</h1>
+{% if not source %}
+<p class="empty">У базі ще немає жодного джерела. Вони з'являються після першого збору.</p>
+{% else %}
+<div hx-target="#results" hx-select="#results" hx-swap="outerHTML" hx-push-url="true">
+  <form class="filters" method="get" action="/products" hx-get="/products"
+        hx-trigger="submit, change, input changed delay:400ms from:#q">
+    <label>Джерело
+      <select name="source">
+        {% for sid in sources %}<option value="{{ sid }}" {% if sid == source %}selected{% endif %}>{{ title_of(sid) }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="grow">Пошук за назвою або кодом
+      <input id="q" type="search" name="q" value="{{ q }}" maxlength="200" placeholder="Напр. 00123 або лампа">
+    </label>
+    <label>Наявність
+      <select name="availability">
+        <option value="">Усі</option>
+        {% for a in ['IN_STOCK', 'OUT_OF_STOCK', 'UNKNOWN'] %}
+        <option value="{{ a }}" {% if a == availability %}selected{% endif %}>{{ availability_labels[a] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="check"><input type="checkbox" name="tracked" value="1" {% if tracked %}checked{% endif %}> Лише відстежувані</label>
+    <noscript><button type="submit">Показати</button></noscript>
+  </form>
+
+  <section id="results">
+    {% if snapshot_at %}
+    <p class="muted">Останній успішний знімок: {{ snapshot_at | utc }} UTC. Знайдено: {{ result.total }}.</p>
+    {% endif %}
+    {% if not snapshot_at %}
+    <p class="empty">Для цього джерела ще немає успішного збору.</p>
+    {% elif not result.rows %}
+    <p class="empty">Нічого не знайдено. Змініть пошук або фільтри.</p>
+    {% else %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Код</th><th>Назва</th><th class="num">Ціна</th><th>Наявність</th><th>Відстеження</th></tr></thead>
+        <tbody>
+        {% for p in result.rows %}
+          <tr>
+            <td><code>{{ p.product_key }}</code></td>
+            <td><a href="{{ link('/product', source=source, key=p.product_key) }}">{{ p.name }}</a></td>
+            <td class="num">{% if p.price is not none %}{{ p.price }} {{ p.currency }}{% else %}<span class="muted">немає ціни</span>{% endif %}</td>
+            <td><span class="stock {{ p.availability }}">{{ availability_labels[p.availability] }}</span></td>
+            <td>{% if p.tracked %}<span class="badge good">так</span>
+              {% if p.threshold %} нижче {{ p.threshold }}{% endif %}{% if p.drop_percent %} −{{ p.drop_percent }}%{% endif %}
+              {% else %}<span class="muted">—</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% with base_path='/products', params={'source': source, 'q': q, 'availability': availability, 'tracked': '1' if tracked else ''} %}
+    {% include "_pager.html" %}
+    {% endwith %}
+    {% endif %}
+  </section>
+</div>
+{% endif %}
+{% endblock %}
