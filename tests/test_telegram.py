@@ -1,5 +1,5 @@
 import pytest
-from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramNetworkError
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramNetworkError, TelegramRetryAfter
 from aiogram.methods import SendMessage
 
 from conftest import make_source
@@ -80,6 +80,8 @@ def test_send_errors_are_classified_for_the_outbox():
     assert isinstance(classify_send_error(TelegramBadRequest(method, "Bad Request: message is too long")), outbox.TemporaryDeliveryError)
     assert isinstance(classify_send_error(TelegramNetworkError(method, "timeout")), outbox.TemporaryDeliveryError)
     assert isinstance(classify_send_error(TimeoutError()), outbox.TemporaryDeliveryError)
+    limited = classify_send_error(TelegramRetryAfter(method, "Too Many Requests: retry after 35", 35))
+    assert isinstance(limited, outbox.RateLimitedError) and limited.retry_after == 35
 
 
 def test_start_explains_the_project_to_anyone_but_only_the_owner_can_manage(bot):

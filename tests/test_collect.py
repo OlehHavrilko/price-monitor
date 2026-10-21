@@ -1,8 +1,10 @@
+from datetime import datetime, timezone
+
 import httpx
 import pytest
 
 from conftest import make_source
-from price_monitor import collector, demo_site, storage
+from price_monitor import collector, demo_site, http, storage
 from price_monitor.collector import collect_once
 
 
@@ -79,6 +81,50 @@ def test_5xx_is_retried_a_limited_number_of_times(conn):
     result = collect_once(conn, make_source("http://shop.test", retries=2), transport(lambda r: httpx.Response(503), calls))
     assert not result.ok and "3 attempts" in result.error
     assert len(calls) == 3
+
+
+def test_retry_after_replaces_the_backoff_delay(conn, monkeypatch):
+    slept, calls = [], []
+    monkeypatch.setattr(http.time, "sleep", slept.append)
+
+    def handler(request):
+        calls.append(1)
+        if len(calls) == 1:
+            return httpx.Response(429, headers={"Retry-After": "7"})
+        if len(calls) == 2:
+            return httpx.Response(503, headers={"Retry-After": "Wed, 21 Oct 2015 07:28:00 GMT"})  # in the past
+        page = int(request.url.params.get("page", "1"))
+        return httpx.Response(200, text=demo_site.render_page(page, "initial"))
+
+    result = collect_once(conn, make_source("http://shop.test", retries=2, retry_backoff=1), httpx.MockTransport(handler))
+    assert result.ok
+    assert slept[:2] == [7.0, 0.0]  # the shop's delay, then "now" for a date that has passed
+
+
+def test_429_without_retry_after_is_retried_with_backoff(conn, monkeypatch):
+    slept, calls = [], []
+    monkeypatch.setattr(http.time, "sleep", slept.append)
+    result = collect_once(conn, make_source("http://shop.test", retries=2, retry_backoff=1), transport(lambda r: httpx.Response(429), calls))
+    assert not result.ok and "HTTP 429" in result.error and "3 attempts" in result.error
+    assert slept == [1, 2] and len(calls) == 3
+
+
+def test_too_long_retry_after_fails_the_run_instead_of_waiting(conn, monkeypatch):
+    slept, calls = [], []
+    monkeypatch.setattr(http.time, "sleep", slept.append)
+    t = transport(lambda r: httpx.Response(429, headers={"Retry-After": "3600"}), calls)
+    result = collect_once(conn, make_source("http://shop.test", retries=3), t)
+    assert not result.ok and not result.fatal and "3600 s" in result.error
+    assert slept == [] and len(calls) == 1
+
+
+def test_retry_after_values():
+    now = datetime(2026, 10, 21, 12, 0, tzinfo=timezone.utc)
+    assert http.retry_after_seconds("120", now) == 120
+    assert http.retry_after_seconds("Wed, 21 Oct 2026 12:00:30 GMT", now) == 30
+    assert http.retry_after_seconds("Wed, 21 Oct 2026 11:00:00 GMT", now) == 0
+    for bad in (None, "", "soon", "-5", "1.5"):
+        assert http.retry_after_seconds(bad, now) is None
 
 
 def test_timeout_then_success_recovers(conn):

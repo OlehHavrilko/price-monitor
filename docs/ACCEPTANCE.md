@@ -37,7 +37,9 @@ stated as it is, including what is not verified.
 ## Priorities
 
 P0 criteria are done except the limits stated for 5 and 8. Of the P1 items: the frequency limit for
-identical source errors and the recovery message are done; `Retry-After` is **not** honoured; the
+identical source errors and the recovery message are done; `Retry-After` is honoured (shops:
+`test_collect::test_retry_after_*`, `test_too_long_retry_after_fails_the_run_instead_of_waiting`;
+Telegram 429: `test_delivery::test_rate_limit_waits_as_told_and_does_not_use_up_attempts`); the
 lost-acknowledgement test uses a stand-in sender; the report size limit (50 000 rows) is done.
 
 ## Not covered
