@@ -1,0 +1,11 @@
+{% if result.pages > 1 %}
+<nav class="pager" aria-label="Сторінки">
+  {% if result.page > 1 %}
+  <a href="{{ link(base_path, page=result.page - 1, **params) }}" hx-get="{{ link(base_path, page=result.page - 1, **params) }}">← Попередня</a>
+  {% endif %}
+  <span>Сторінка {{ result.page }} з {{ result.pages }}</span>
+  {% if result.page < result.pages %}
+  <a href="{{ link(base_path, page=result.page + 1, **params) }}" hx-get="{{ link(base_path, page=result.page + 1, **params) }}">Наступна →</a>
+  {% endif %}
+</nav>
+{% endif %}

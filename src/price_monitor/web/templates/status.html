@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Стан{% endblock %}
+{% block content %}
+<h1>Стан сервісу</h1>
+<div class="cards">
+  <section class="panel">
+    <h2>Черга сповіщень</h2>
+    <dl class="facts">
+      <dt>Очікують</dt><dd>{{ s.outbox.pending }}</dd>
+      <dt>Надіслано</dt><dd>{{ s.outbox.sent }}</dd>
+      <dt>Не доставлено</dt><dd>{{ s.outbox.failed }}</dd>
+    </dl>
+    {% if s.last_failure %}<p class="error">Остання помилка доставки: {{ s.last_failure }}</p>{% endif %}
+  </section>
+  <section class="panel">
+    <h2>База даних</h2>
+    <dl class="facts">
+      <dt>Схема</dt><dd>v{{ schema }}</dd>
+      <dt>Товарів</dt><dd>{{ s.totals.products }}</dd>
+      <dt>Спостережень</dt><dd>{{ s.totals.observations }}</dd>
+      <dt>Подій</dt><dd>{{ s.totals.events }}</dd>
+      <dt>Зборів</dt><dd>{{ s.totals.runs }}</dd>
+    </dl>
+    <p class="muted">Відкрито лише для читання.</p>
+  </section>
+</div>
+
+{% if s.health %}
+<section class="panel">
+  <h2>Джерела</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Джерело</th><th>Стан</th><th>Остання помилка</th></tr></thead>
+      <tbody>
+      {% for h in s.health %}
+        <tr><td>{{ title_of(h.source_id) }} <code>{{ h.source_id }}</code></td>
+          <td>{% if h.stopped %}<span class="badge bad">зупинено</span>{% elif h.alerted %}<span class="badge warn">недоступне</span>{% else %}<span class="badge good">працює</span>{% endif %}</td>
+          <td>{{ h.last_error or '—' }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+<section class="panel">
+  <h2>Останні збори</h2>
+  {% if s.runs %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>№</th><th>Джерело</th><th>Початок (UTC)</th><th>Кінець (UTC)</th><th>Результат</th><th class="num">Товарів</th><th>Помилка</th></tr></thead>
+      <tbody>
+      {% for r in s.runs %}
+        <tr><td>{{ r.id }}</td><td>{{ title_of(r.source_id) }}</td><td>{{ r.started_at | utc }}</td><td>{{ r.finished_at | utc }}</td>
+          <td><span class="run {{ r.status }}">{{ run_labels.get(r.status, r.status) }}</span></td>
+          <td class="num">{{ r.product_count if r.product_count is not none else '—' }}</td><td>{{ r.error or '' }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">Зборів ще не було.</p>
+  {% endif %}
+</section>
+{% endblock %}

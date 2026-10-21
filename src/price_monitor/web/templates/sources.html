@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Джерела{% endblock %}
+{% block content %}
+<h1>Джерела</h1>
+{% if not sources %}
+<p class="empty">У базі ще немає жодного джерела. Вони з'являються після першого збору.</p>
+{% else %}
+<div class="cards">
+  {% for s in sources %}
+  <article class="panel source">
+    <header>
+      <h2><a href="{{ link('/products', source=s.id) }}">{{ title_of(s.id) }}</a></h2>
+      {% if s.stopped %}<span class="badge bad">Зупинено</span>
+      {% elif s.alerted %}<span class="badge warn">Недоступне</span>
+      {% elif s.last_success %}<span class="badge good">Працює</span>
+      {% else %}<span class="badge">Немає даних</span>{% endif %}
+    </header>
+    <p class="muted"><code>{{ s.id }}</code> · {{ s.base_url }}</p>
+    <dl class="facts">
+      <dt>Останній успішний збір</dt>
+      <dd>{% if s.last_success %}{{ s.last_success.finished_at | utc }}{% else %}—{% endif %}</dd>
+      <dt>Товарів у знімку</dt>
+      <dd>{% if s.last_success %}{{ s.last_success.product_count }}{% else %}—{% endif %}</dd>
+      <dt>Наявність</dt>
+      <dd>
+        {% if s.stock %}
+        <span class="chips">
+          <span class="stock IN_STOCK">{{ s.stock.get('IN_STOCK', 0) }} в наявності</span>
+          <span class="stock OUT_OF_STOCK">{{ s.stock.get('OUT_OF_STOCK', 0) }} немає</span>
+          <span class="stock UNKNOWN">{{ s.stock.get('UNKNOWN', 0) }} невідомо</span>
+        </span>
+        {% else %}—{% endif %}
+      </dd>
+      <dt>Відстежується</dt>
+      <dd>{{ s.tracked }}</dd>
+      <dt>Подій за 24 год</dt>
+      <dd><a href="{{ link('/events', source=s.id) }}">{{ s.events_day }}</a></dd>
+      <dt>Остання спроба</dt>
+      <dd>{% if s.last_run %}{{ run_labels.get(s.last_run.status, s.last_run.status) }}, {{ s.last_run.started_at | utc }}{% else %}—{% endif %}</dd>
+    </dl>
+    {% if s.health_error %}<p class="error">Остання помилка: {{ s.health_error }}</p>{% endif %}
+    {% if s.stopped %}<p class="muted">Збір зупинено після відмови в доступі. Відновлення: <code>price-monitor resume-source {{ s.id }}</code>.</p>{% endif %}
+  </article>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

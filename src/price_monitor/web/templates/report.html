@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Звіт{% endblock %}
+{% block content %}
+<h1>XLSX-звіт</h1>
+<section class="panel">
+  {% if not source %}
+  <p class="empty">У базі ще немає жодного джерела. Звіт можна створити після першого збору.</p>
+  {% else %}
+  {% for e in errors %}<p class="error" role="alert">{{ e }}</p>{% endfor %}
+  <form class="filters" method="get" action="/report.xlsx">
+    <label>Джерело
+      <select name="source">
+        {% for sid in sources %}<option value="{{ sid }}" {% if sid == source %}selected{% endif %}>{{ title_of(sid) }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>З (UTC)<input type="date" name="since" value="{{ since }}" required></label>
+    <label>По (включно)<input type="date" name="until" value="{{ until }}" required></label>
+    <button type="submit">Завантажити XLSX</button>
+  </form>
+  <ul class="muted notes">
+    <li>Аркуш <b>Current</b> — останнє спостереження кожного товару, який будь-коли бачили, з поміткою REMOVED для видалених. Період на нього не впливає.</li>
+    <li>Аркуш <b>History</b> — події за вибраний період, UTC, обидві дати включно.</li>
+    <li>Коди товарів зберігаються як текст (00123 і 123 — різні товари). Не більше {{ max_rows }} рядків.</li>
+    <li>Той самий звіт будує команда <code>price-monitor report</code> і кнопка «XLSX-звіт» у Telegram.</li>
+  </ul>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Події{% endblock %}
+{% block content %}
+<h1>Події</h1>
+<div hx-target="#results" hx-select="#results" hx-swap="outerHTML" hx-push-url="true">
+  <form class="filters" method="get" action="/events" hx-get="/events"
+        hx-trigger="submit, change, input changed delay:400ms from:#q">
+    <label>Джерело
+      <select name="source">
+        <option value="">Усі</option>
+        {% for sid in sources %}<option value="{{ sid }}" {% if sid == source %}selected{% endif %}>{{ title_of(sid) }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Тип
+      <select name="kind">
+        <option value="">Усі</option>
+        {% for k in kinds %}<option value="{{ k }}" {% if k == kind %}selected{% endif %}>{{ event_labels[k] }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="grow">Товар (назва або код)
+      <input id="q" type="search" name="q" value="{{ q }}" maxlength="200">
+    </label>
+    <label>З (UTC)<input type="date" name="since" value="{{ since }}"></label>
+    <label>По (включно)<input type="date" name="until" value="{{ until }}"></label>
+    <noscript><button type="submit">Показати</button></noscript>
+  </form>
+
+  <section id="results">
+    {% for e in errors %}<p class="error" role="alert">{{ e }}</p>{% endfor %}
+    <p class="muted">Знайдено: {{ result.total }}.</p>
+    {% if not result.rows %}
+    <p class="empty">Подій не знайдено. Перший збір лише запам'ятовує каталог, події з'являються з другого.</p>
+    {% else %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Час (UTC)</th><th>Джерело</th><th>Товар</th><th>Подія</th><th>Було</th><th>Стало</th></tr></thead>
+        <tbody>
+        {% for e in result.rows %}
+          <tr>
+            <td>{{ e.created_at | utc }}</td>
+            <td>{{ title_of(e.source_id) }}</td>
+            <td><a href="{{ link('/product', source=e.source_id, key=e.product_key) }}"><code>{{ e.product_key }}</code> {{ e.name or '' }}</a></td>
+            <td><span class="kind {{ e.kind }}">{{ event_labels.get(e.kind, e.kind) }}</span></td>
+            <td>{{ e.old_value | event_value }}</td>
+            <td>{{ e.new_value | event_value }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% with base_path='/events', params={'source': source, 'kind': kind, 'q': q, 'since': since, 'until': until} %}
+    {% include "_pager.html" %}
+    {% endwith %}
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
