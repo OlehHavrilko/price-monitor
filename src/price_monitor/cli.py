@@ -61,6 +61,28 @@ def cmd_run(args: argparse.Namespace) -> int:
     return asyncio.run(run_service())
 
 
+def cmd_web(args: argparse.Namespace) -> int:
+    try:
+        import uvicorn
+
+        from .web import auth
+        from .web.app import create_app
+    except ImportError:
+        print('The dashboard needs the "web" extra: pip install ".[web]"', file=sys.stderr)
+        return 2
+    try:
+        app = create_app(
+            config.db_path(), auth.check_token_strength(config.web_token()), config.sources(),
+            secure_cookie=config.web_secure_cookie(),
+        )
+    except auth.TokenError as exc:
+        print(exc, file=sys.stderr)
+        return 2
+    print(f"Dashboard on http://{args.host}:{args.port} (read-only, database {config.db_path()})")
+    uvicorn.run(app, host=args.host, port=args.port, server_header=False, proxy_headers=False, log_level="info")
+    return 0
+
+
 def cmd_demo_play(args: argparse.Namespace) -> int:
     from .demo_play import play
 
@@ -143,6 +165,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--since", required=True, help="start, ISO date or datetime, e.g. 2026-10-01")
     p.add_argument("--until", required=True, help="end, ISO date or datetime, e.g. 2026-11-01")
     p.set_defaults(func=cmd_report)
+
+    p = sub.add_parser("web", help="run the read-only web dashboard (needs PRICE_MONITOR_WEB_TOKEN)")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8000)
+    p.set_defaults(func=cmd_web)
 
     p = sub.add_parser("demo-serve", help="run the local demo catalog")
     p.add_argument("--host", default="127.0.0.1")

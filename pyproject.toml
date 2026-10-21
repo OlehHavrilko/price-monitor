@@ -18,12 +18,17 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+# Read-only web dashboard (`price-monitor web`).
+web = ["fastapi>=0.110", "jinja2>=3.1", "uvicorn>=0.29"]
 
 [project.scripts]
 price-monitor = "price_monitor.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"price_monitor.web" = ["templates/*.html", "static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -9,7 +9,7 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
-RUN pip install .
+RUN pip install ".[web]"
 
 # Fixed UID so both containers can write to the shared named volumes.
 RUN useradd --uid 10001 --create-home monitor && mkdir -p /data /demo-state && chown monitor /data /demo-state

@@ -67,5 +67,14 @@ def telegram_enabled() -> bool:
     return telegram_token() is not None and bool(allowed_ids())
 
 
+def web_token() -> str | None:
+    return os.environ.get("PRICE_MONITOR_WEB_TOKEN") or None
+
+
+def web_secure_cookie() -> bool:
+    """Set to 1 when the dashboard is served over HTTPS (behind a TLS proxy)."""
+    return os.environ.get("PRICE_MONITOR_WEB_SECURE_COOKIE") == "1"
+
+
 def lock_dir() -> Path:
     return db_path().parent
