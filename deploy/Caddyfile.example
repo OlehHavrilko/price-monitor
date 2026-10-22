@@ -1,8 +1,8 @@
 # TLS proxy in front of the dashboard (`docker compose --profile web up -d web`, 127.0.0.1:8000).
-# Replace the host name. 92-5-167-222.sslip.io style names resolve to the IP in them and get a
-# Let's Encrypt certificate without owning a domain. Ports 80 and 443 must be open.
+# Replace the host name with your own. A free DuckDNS name (an A record to the server IP) or any domain works;
+# Caddy gets a Let's Encrypt certificate by itself. Ports 80 and 443 must be open.
 # Set PRICE_MONITOR_WEB_SECURE_COOKIE=1 in .env when the dashboard is served this way.
-92-5-167-222.sslip.io {
+price-monitor-demo.duckdns.org {
 	encode gzip
 	reverse_proxy 127.0.0.1:8000
 }

@@ -2,7 +2,7 @@
 
 Monitors prices and stock of products in a few fixed catalogs. It keeps the history in SQLite, sends Telegram alerts for the products you track, and builds XLSX reports.
 
-**Status: release 1 is feature-complete and runs on a server.** What is checked and what is not: [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md). Demo video (1:50, subtitles): https://youtu.be/h9beBnU3xPE. Live read-only dashboard: https://92-5-167-222.sslip.io (demo token `price-monitor-demo`). Screenshots from a real Telegram chat are in [Real chat](#real-chat) below.
+**Status: release 1 is feature-complete and runs on a server.** What is checked and what is not: [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md). Demo video (1:50, subtitles): https://youtu.be/h9beBnU3xPE. Live read-only dashboard: https://price-monitor-demo.duckdns.org (demo token `price-monitor-demo`). Screenshots from a real Telegram chat are in [Real chat](#real-chat) below.
 
 ## What it does
 
@@ -126,7 +126,7 @@ docker compose --profile web up -d --build
 
 Open http://127.0.0.1:8000 and enter the token. The port is published on 127.0.0.1 only; to reach it from another machine, use an SSH tunnel (`ssh -L 8000:127.0.0.1:8000 server`) or a reverse proxy with TLS, and then set `PRICE_MONITOR_WEB_SECURE_COOKIE=1`. Plain `docker compose up` does not start the dashboard.
 
-Public demo: the dashboard of the server run is open at https://92-5-167-222.sslip.io, sign in with the demo token `price-monitor-demo`. It is read-only and shows demo data and the public xcom.ua catalog. HTTPS comes from Caddy ([deploy/Caddyfile.example](deploy/Caddyfile.example), [deploy/compose.proxy.yaml](deploy/compose.proxy.yaml)). The status page hides the Telegram chat id and any bot token from delivery errors, so it is safe to show.
+Public demo: the dashboard of the server run is open at https://price-monitor-demo.duckdns.org, sign in with the demo token `price-monitor-demo`. It is read-only and shows demo data and the public xcom.ua catalog. HTTPS comes from Caddy ([deploy/Caddyfile.example](deploy/Caddyfile.example), [deploy/compose.proxy.yaml](deploy/compose.proxy.yaml)). The status page hides the Telegram chat id and any bot token from delivery errors, so it is safe to show.
 
 ![Dashboard pages](docs/screenshots/web-collage.png)
 
