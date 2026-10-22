@@ -13,7 +13,7 @@ stated as it is, including what is not verified.
 | 5 | Events and outbox saved transactionally; restart continues delivery; ambiguous network outcome and possible duplicate | Done with a limit | Transactional write and restart: `test_delivery`. The lost-acknowledgement case is tested with a stand-in **sender function**, not with a substituted HTTP transport |
 | 6 | Parsers tested on HTML fixtures without a network; a local HTTP stand tests real pagination and network failures | Done | `test_demo_adapter`, `test_books_adapter`, `test_allo_adapter`, `test_xcom_adapter` (fixtures); `test_collect` (real local HTTP server) |
 | 7 | One broken source does not block another; repeated errors do not flood Telegram | Done | `test_delivery::test_broken_source_does_not_block_another_source`, `test_source_outage_is_reported_once_and_recovery_once` |
-| 8 | Two simultaneous runs of one source do not write history concurrently; no flood of missed runs after a restart | Done, partly by configuration | Thread and cross-process file locks: `test_delivery::test_file_lock_keeps_a_second_process_out`. `coalesce`, `max_instances=1` and the single immediate run after a start are set in `scheduler.py` and checked by hand (a second service instance is refused); there is no automated test of the scheduler |
+| 8 | Two simultaneous runs of one source do not write history concurrently; no flood of missed runs after a restart | Done | Thread and cross-process file locks: `test_delivery::test_file_lock_keeps_a_second_process_out`. Scheduler, on a real APScheduler loop with a stand-in collection: `test_scheduler::test_first_collection_starts_right_away_and_runs_never_overlap` (a collection slower than its interval is never joined by the next one), `test_missed_runs_are_not_replayed_after_a_pause` (4 s of missed 1-second runs give one run), `test_one_job_per_source_with_its_interval_and_an_immediate_first_run`, `test_a_second_service_instance_is_refused`. Each of the first three fails when `coalesce` / `max_instances` are switched off |
 | 9 | An unauthorised Telegram ID changes no rules and gets no reports; a repeated update does not duplicate tracking | Done | `test_telegram`, `test_menu` |
 | 10 | XLSX reopens, matches the data, keeps string keys, has no executable formulas from text fields | Done | `test_reports`, `test_null_price` |
 | 11 | A clean run by the README builds a first report on demo data without a network or Telegram; the database and tracking survive a container restart | Done on the VPS | `docker compose up --build` on aarch64 Ubuntu 24.04, `down` / `up` kept the history and events. CI also builds the image |
@@ -36,7 +36,7 @@ stated as it is, including what is not verified.
 
 ## Priorities
 
-P0 criteria are done except the limits stated for 5 and 8. Of the P1 items: the frequency limit for
+P0 criteria are done except the limit stated for 5. Of the P1 items: the frequency limit for
 identical source errors and the recovery message are done; `Retry-After` is honoured (shops:
 `test_collect::test_retry_after_*`, `test_too_long_retry_after_fails_the_run_instead_of_waiting`;
 Telegram 429: `test_delivery::test_rate_limit_waits_as_told_and_does_not_use_up_attempts`); the
