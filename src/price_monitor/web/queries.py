@@ -47,8 +47,9 @@ def event_kind(event_type: str, new_value: str | None) -> str:
     return event_type
 
 
-def source_ids(conn: sqlite3.Connection) -> list[str]:
-    return [r[0] for r in conn.execute("SELECT id FROM sources ORDER BY id")]
+def source_ids(conn: sqlite3.Connection, only: set[str] | None = None) -> list[str]:
+    """Source ids from the database; `only` keeps the ones that are currently configured (None keeps all)."""
+    return [r[0] for r in conn.execute("SELECT id FROM sources ORDER BY id") if only is None or r[0] in only]
 
 
 def _last_success_id(conn: sqlite3.Connection, source_id: str) -> int | None:
@@ -58,11 +59,13 @@ def _last_success_id(conn: sqlite3.Connection, source_id: str) -> int | None:
     return row[0]
 
 
-def sources_overview(conn: sqlite3.Connection) -> list[dict]:
+def sources_overview(conn: sqlite3.Connection, only: set[str] | None = None) -> list[dict]:
     since = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
     result = []
     for source in conn.execute("SELECT * FROM sources ORDER BY id").fetchall():
         sid = source["id"]
+        if only is not None and sid not in only:
+            continue
         last_run = conn.execute(
             "SELECT * FROM collection_runs WHERE source_id = ? ORDER BY id DESC LIMIT 1", (sid,)
         ).fetchone()

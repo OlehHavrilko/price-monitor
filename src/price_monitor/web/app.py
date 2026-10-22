@@ -126,6 +126,8 @@ def create_app(
 ) -> FastAPI:
     auth.check_token_strength(token)
     titles = {sid: cfg.title or sid for sid, cfg in (sources or {}).items()}
+    # A source that is switched off in the configuration (its old rows stay in the database) is not shown.
+    shown = set(titles) if sources else None
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, title="Price Monitor")
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
@@ -212,10 +214,10 @@ def create_app(
 
     @app.get("/")
     def sources_page(request: Request, conn: sqlite3.Connection = Depends(connection)):
-        return render(request, "sources.html", {"active": "sources", "sources": queries.sources_overview(conn)})
+        return render(request, "sources.html", {"active": "sources", "sources": queries.sources_overview(conn, shown)})
 
     def _pick_source(conn: sqlite3.Connection, requested: str | None) -> tuple[str | None, list[str]]:
-        known = queries.source_ids(conn)
+        known = queries.source_ids(conn, shown)
         if requested:
             if requested not in known:
                 raise HTTPException(404, f"Джерела «{requested}» немає в базі.")
@@ -271,7 +273,7 @@ def create_app(
         conn: sqlite3.Connection = Depends(connection),
     ):
         errors: list[str] = []
-        known = queries.source_ids(conn)
+        known = queries.source_ids(conn, shown)
         if source and source not in known:
             raise HTTPException(404, f"Джерела «{source}» немає в базі.")
         start = _parse_day(since, "з", errors)

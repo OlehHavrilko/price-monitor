@@ -186,6 +186,15 @@ def test_status_hides_the_chat_id_and_bot_tokens(db):
     assert "bot&lt;hidden&gt;" in html
 
 
+def test_sources_switched_off_in_the_configuration_are_not_shown(db):
+    conn = storage.connect(db)
+    conn.execute("INSERT INTO sources(id, base_url) VALUES ('allo', 'https://allo.ua')")
+    conn.commit()
+    conn.close()
+    html = client_for(db).get("/", headers=BEARER).text
+    assert "allo.ua" not in html and "demo" in html
+
+
 def test_missing_or_foreign_database_is_explained_not_created(tmp_path):
     missing = tmp_path / "none.db"
     response = client_for(missing).get("/", headers=BEARER)
