@@ -15,3 +15,4 @@ The `web-*.png` files were captured in Chromium (1280 px, light theme) from
 | `web-events.png` | Події — price changes, sold out / back in stock, removed / returned |
 | `web-report.png` | Звіт — period form |
 | `web-status.png` | Стан — queue, database and recent collections |
+| `web-collage.png` | all six dashboard pages in one picture (used on the freelance portfolio) |

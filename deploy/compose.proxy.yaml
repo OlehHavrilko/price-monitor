@@ -1,0 +1,12 @@
+# Caddy with automatic HTTPS next to the dashboard: `docker compose -f deploy/compose.proxy.yaml up -d`.
+# Host networking lets it reach the dashboard that is published on 127.0.0.1:8000 only.
+services:
+  caddy:
+    image: caddy:2
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro # copy Caddyfile.example to Caddyfile and edit the host name
+      - caddy-data:/data
+volumes:
+  caddy-data:

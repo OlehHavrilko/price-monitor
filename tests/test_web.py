@@ -172,6 +172,20 @@ def test_the_dashboard_never_writes(client, db):
     conn.close()
 
 
+def test_status_hides_the_chat_id_and_bot_tokens(db):
+    conn = storage.connect(db)
+    conn.execute(
+        "INSERT INTO notification_outbox(chat_id, dedupe_key, text, status, attempts, next_attempt_at, last_error, created_at) "
+        "VALUES (424242, 'k', 't', 'failed', 5, '2026-01-01T00:00:00+00:00', "
+        "'Client error for url https://api.telegram.org/bot123456:ABC-def_ghi/sendMessage', '2026-01-01T00:00:00+00:00')"
+    )
+    conn.commit()
+    conn.close()
+    html = client_for(db).get("/status", headers=BEARER).text
+    assert "424242" not in html and "ABC-def_ghi" not in html
+    assert "bot&lt;hidden&gt;" in html
+
+
 def test_missing_or_foreign_database_is_explained_not_created(tmp_path):
     missing = tmp_path / "none.db"
     response = client_for(missing).get("/", headers=BEARER)

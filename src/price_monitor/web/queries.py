@@ -1,6 +1,7 @@
 """SELECT-only queries behind the dashboard pages. Every value from a request is a bound parameter."""
 from __future__ import annotations
 
+import re
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -231,10 +232,21 @@ def events(
     return Page([dict(r) | {"kind": event_kind(r["type"], r["new_value"])} for r in rows], total, page)
 
 
+_BOT_TOKEN = re.compile(r"bot\d+:[\w-]+")
+
+
+def _public_failure(conn: sqlite3.Connection) -> str | None:
+    """The delivery error without the chat id and without any bot token a library put into the message."""
+    row = conn.execute(
+        "SELECT last_error FROM notification_outbox WHERE status = 'failed' ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+    return _BOT_TOKEN.sub("bot<hidden>", row["last_error"] or "") if row else None
+
+
 def status(conn: sqlite3.Connection) -> dict:
     return {
         "outbox": outbox.counts(conn),
-        "last_failure": outbox.last_failure(conn),
+        "last_failure": _public_failure(conn),
         "runs": [dict(r) for r in conn.execute("SELECT * FROM collection_runs ORDER BY id DESC LIMIT 20")],
         "health": [dict(r) for r in conn.execute("SELECT * FROM source_health ORDER BY source_id")],
         "totals": {
